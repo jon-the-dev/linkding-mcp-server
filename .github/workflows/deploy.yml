@@ -25,5 +25,5 @@ jobs:
       - run: pip install mkdocs-git-revision-date-localized-plugin
       - run: pip install pymdown-extensions
       - run: pip install mkdocs-print-site-plugin
-      p run: pip install fastmcp httpx python-dotenv pydantic
+      p run: pip install mkdocs mkdocs-material mkdocstrings mkdocstrings-python pymdown-extensions
       - run: mkdocs gh-deploy --force
