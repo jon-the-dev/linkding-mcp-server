@@ -27,12 +27,25 @@ logger = logging.getLogger(__name__)
 LINKDING_URL = os.getenv("LINKDING_URL", "http://127.0.0.1:9090")
 LINKDING_API_TOKEN = os.getenv("LINKDING_API_TOKEN")
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+ENABLE_DESTRUCTIVE_ACTIONS = os.getenv("LINKDING_ENABLE_DESTRUCTIVE_ACTIONS", "false").lower() == "true"
 
 if not LINKDING_API_TOKEN:
     raise ValueError("LINKDING_API_TOKEN environment variable is required")
 
 # Remove trailing slash from URL
 LINKDING_URL = LINKDING_URL.rstrip("/")
+
+# Security check for destructive actions
+def check_destructive_actions_enabled() -> str:
+    """Check if destructive actions are enabled, return error message if not."""
+    if not ENABLE_DESTRUCTIVE_ACTIONS:
+        return (
+            "Error: Destructive actions are disabled for security. "
+            "To enable bookmark modifications, set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true "
+            "in your environment variables or .env file. "
+            "This includes: add, update, delete, archive, and unarchive operations."
+        )
+    return ""
 
 # Data Models
 class Bookmark(BaseModel):
@@ -203,6 +216,11 @@ async def add_bookmark(
     Returns:
         JSON string containing the created bookmark data
     """
+    # Security check for destructive actions
+    security_error = check_destructive_actions_enabled()
+    if security_error:
+        return security_error
+        
     try:
         payload = {
             "url": url,
@@ -293,6 +311,11 @@ async def update_bookmark(
     Returns:
         JSON string containing the updated bookmark data
     """
+    # Security check for destructive actions
+    security_error = check_destructive_actions_enabled()
+    if security_error:
+        return security_error
+        
     try:
         payload = {}
         
@@ -344,6 +367,11 @@ async def delete_bookmark(bookmark_id: int) -> str:
     Returns:
         Success or error message
     """
+    # Security check for destructive actions
+    security_error = check_destructive_actions_enabled()
+    if security_error:
+        return security_error
+        
     try:
         response = await client.delete(f"/bookmarks/{bookmark_id}/")
         
@@ -370,6 +398,11 @@ async def archive_bookmark(bookmark_id: int) -> str:
     Returns:
         Success or error message
     """
+    # Security check for destructive actions
+    security_error = check_destructive_actions_enabled()
+    if security_error:
+        return security_error
+        
     try:
         response = await client.post(f"/bookmarks/{bookmark_id}/archive/")
         
@@ -396,6 +429,11 @@ async def unarchive_bookmark(bookmark_id: int) -> str:
     Returns:
         Success or error message
     """
+    # Security check for destructive actions
+    security_error = check_destructive_actions_enabled()
+    if security_error:
+        return security_error
+        
     try:
         response = await client.post(f"/bookmarks/{bookmark_id}/unarchive/")
         

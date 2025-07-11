@@ -46,15 +46,23 @@ No, Docker is not required. The server runs as a standard Python application. Ho
 
 ### What can I do with this server?
 
-You can:
+The server provides two modes of operation:
+
+**Read-Only Mode (Default - Secure):**
 - Search your bookmarks by text, tags, or status
+- Retrieve bookmark details
+- List and browse tags
+- Check if URLs are already bookmarked
+- Filter bookmarks by specific tags
+
+**Full Access Mode (Requires explicit enable):**
+- All read-only features above, plus:
 - Add new bookmarks with automatic metadata scraping
 - Update existing bookmarks (title, description, notes, tags)
 - Delete bookmarks
 - Archive and unarchive bookmarks
-- Check if URLs are already bookmarked
-- List and manage tags
-- Filter bookmarks by specific tags
+
+To enable full access, set `LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true` in your environment.
 
 ### Can I use this with Claude Desktop?
 
@@ -112,6 +120,26 @@ The server doesn't implement caching, but you can:
 - Use LinkDing's built-in caching mechanisms
 
 ## Security and Privacy
+
+### Why can't I add or modify bookmarks?
+
+By default, the LinkDing MCP Server operates in **read-only mode** for security. This prevents accidental or unauthorized modifications to your bookmark collection.
+
+To enable bookmark modifications:
+
+1. **Set the environment variable:**
+   ```env
+   LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true
+   ```
+
+2. **Or add to your `.env` file:**
+   ```env
+   LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true
+   ```
+
+3. **Restart the MCP server**
+
+This security feature ensures that MCP clients can only read your bookmarks unless you explicitly grant write permissions.
 
 ### Is my data secure?
 

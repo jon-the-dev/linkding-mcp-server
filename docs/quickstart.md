@@ -25,7 +25,11 @@ pip install -r requirements.txt
 # Configure environment
 cp .env.sample .env
 # Edit .env with your LinkDing URL and API token
+# Set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true to allow bookmark modifications
 ```
+
+!!! info "Security Feature"
+    By default, the server operates in **read-only mode** for security. You can search and view bookmarks, but cannot add, update, or delete them. To enable full functionality, set `LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true` in your `.env` file.
 
 ### 2. Test Connection
 

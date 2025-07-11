@@ -15,6 +15,7 @@ The LinkDing MCP Server is configured through environment variables. This guide 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LINKDING_URL` | `http://127.0.0.1:9090` | URL of your LinkDing instance |
+| `LINKDING_ENABLE_DESTRUCTIVE_ACTIONS` | `false` | Enable bookmark modifications (add, update, delete, archive) |
 | `DEBUG` | `false` | Enable debug logging |
 
 ## Configuration File
@@ -26,8 +27,53 @@ Create a `.env` file in the project root:
 LINKDING_URL=http://127.0.0.1:9090
 LINKDING_API_TOKEN=your_api_token_here
 
+# Security Settings
+LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=false
+
 # Optional Settings
 DEBUG=false
+```
+
+## Security Configuration
+
+### Destructive Actions Protection
+
+By default, the LinkDing MCP Server operates in **read-only mode** for security. This means only safe operations are allowed:
+
+**Always Allowed (Safe Actions):**
+- `search_bookmarks` - Search your bookmarks
+- `get_bookmark` - Retrieve bookmark details
+- `list_tags` - List available tags
+- `list_bookmarks_by_tag` - Filter bookmarks by tag
+- `check_url` - Check if URL is already bookmarked
+
+**Requires Explicit Enable (Destructive Actions):**
+- `add_bookmark` - Create new bookmarks
+- `update_bookmark` - Modify existing bookmarks
+- `delete_bookmark` - Permanently delete bookmarks
+- `archive_bookmark` - Archive bookmarks
+- `unarchive_bookmark` - Unarchive bookmarks
+
+### Enabling Destructive Actions
+
+To enable bookmark modifications, set the environment variable:
+
+```env
+LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true
+```
+
+!!! warning "Security Consideration"
+    Only enable destructive actions if you trust the MCP client and understand that it will have full access to modify your bookmarks. MCP servers are powerful and should be used with appropriate caution.
+
+### Error Messages
+
+When destructive actions are attempted but not enabled, you'll see:
+
+```
+Error: Destructive actions are disabled for security. 
+To enable bookmark modifications, set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true 
+in your environment variables or .env file. 
+This includes: add, update, delete, archive, and unarchive operations.
 ```
 
 ## LinkDing URL Configuration

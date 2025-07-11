@@ -47,16 +47,19 @@ Edit the configuration file to include the LinkDing MCP Server:
 {
   "mcpServers": {
     "linkding": {
-      "command": "python",
-      "args": ["/absolute/path/to/linkding-mcp-server/linkding_server.py"],
+      "command": "/absolute/path/to/linkding_server.py",
       "env": {
         "LINKDING_URL": "http://127.0.0.1:9090",
-        "LINKDING_API_TOKEN": "your_api_token_here"
+        "LINKDING_API_TOKEN": "your_api_token_here",
+        "LINKDING_ENABLE_DESTRUCTIVE_ACTIONS": "true"
       }
     }
   }
 }
 ```
+
+!!! warning "Security Note"
+    The `LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true` setting allows Claude to add, update, delete, and archive your bookmarks. Only enable this if you trust Claude with full access to your bookmark collection. Without this setting, Claude can only search and read your bookmarks.
 
 !!! important "Use Absolute Paths"
     Always use absolute paths in the configuration. Relative paths may not work correctly.
