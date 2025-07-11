@@ -1,0 +1,84 @@
+site_name: LinkDing MCP Server
+site_description: A Model Context Protocol server for interacting with LinkDing bookmark manager
+site_author: LinkDing MCP Server Contributors
+site_url: https://github.com/jon-the-dev/linkding-mcp-server
+
+repo_name: linkding-mcp-server
+repo_url: https://github.com/jon-the-dev/linkding-mcp-server
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: installation.md
+      - Configuration: configuration.md
+      - Quick Start: quickstart.md
+  - Tools Reference:
+      - Overview: tools/overview.md
+      - Search Tools: tools/search.md
+      - Bookmark Management: tools/bookmarks.md
+      - Tag Management: tools/tags.md
+  - Integration:
+      - Claude Desktop: integration/claude.md
+      - Other MCP Clients: integration/clients.md
+  - Development:
+      - API Reference: api/reference.md
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
+  - Troubleshooting: troubleshooting.md
+  - FAQ: faq.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jon-the-dev/linkding-mcp-server
