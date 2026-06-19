@@ -21,32 +21,27 @@ A Model Context Protocol (MCP) server for interacting with [LinkDing](https://gi
 
 ## Installation
 
-1. **Clone or download this repository**:
+**Install from PyPI:**
 
-   ```bash
-   git clone <repository-url>
-   cd linkding-mcp-server
-   ```
+```bash
+pip install linkding-mcp-server
+```
 
-2. **Install dependencies**:
+**Configure environment variables:**
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+Create a `.env` file with your LinkDing configuration:
 
-3. **Configure environment variables**:
+```env
+LINKDING_URL=http://127.0.0.1:9090
+LINKDING_API_TOKEN=your_api_token_here
+DEBUG=false
+```
 
-   ```bash
-   cp .env.sample .env
-   ```
+Or run the interactive setup helper:
 
-   Edit `.env` and set your LinkDing configuration:
-
-   ```env
-   LINKDING_URL=http://127.0.0.1:9090
-   LINKDING_API_TOKEN=your_api_token_here
-   DEBUG=false
-   ```
+```bash
+linkding-mcp-setup
+```
 
 ## Getting Your LinkDing API Token
 
@@ -60,22 +55,22 @@ A Model Context Protocol (MCP) server for interacting with [LinkDing](https://gi
 
 ### Running the Server
 
-**Option 1: Direct Python execution**
+**Option 1: Console script (recommended)**
 
 ```bash
-python linkding_server.py
+linkding-mcp-server
 ```
 
-**Option 2: Using FastMCP CLI (recommended)**
+**Option 2: Direct Python execution**
 
 ```bash
-fastmcp run linkding_server.py
+python -m linkding_mcp_server.server
 ```
 
 **Option 3: HTTP transport for web deployment**
 
 ```bash
-fastmcp run linkding_server.py --transport http --port 8000
+fastmcp run linkding_mcp_server.server:main --transport http --port 8000
 ```
 
 ### Available Tools
@@ -208,8 +203,7 @@ To use this server with Claude Desktop, add it to your Claude configuration:
    {
      "mcpServers": {
        "linkding": {
-         "command": "python",
-         "args": ["/path/to/linkding-mcp-server/linkding_server.py"],
+         "command": "linkding-mcp-server",
          "env": {
            "LINKDING_URL": "http://127.0.0.1:9090",
            "LINKDING_API_TOKEN": "your_api_token_here"
@@ -227,11 +221,20 @@ To use this server with Claude Desktop, add it to your Claude configuration:
 
 ```
 linkding-mcp-server/
-├── linkding_server.py      # Main server implementation
-├── requirements.txt        # Python dependencies
-├── .env.sample            # Environment variables template
-├── .env                   # Your local environment (not in git)
-└── README.md              # This file
+├── linkding_mcp_server/    # Installable Python package
+│   ├── __init__.py         # Package version and exports
+│   ├── config.py           # Settings class and singleton
+│   ├── client.py           # LinkDingClient HTTP wrapper
+│   ├── models.py           # Pydantic models
+│   ├── tools.py            # MCP tool registrations
+│   ├── server.py           # main() entry point
+│   └── setup.py            # Interactive setup helper
+├── tests/                  # Test suite
+├── pyproject.toml          # Package metadata and build config
+├── requirements.txt        # Runtime dependencies
+├── .env.sample             # Environment variables template
+├── .env                    # Your local environment (not in git)
+└── README.md               # This file
 ```
 
 ### Adding New Features
@@ -296,7 +299,7 @@ Contributions are welcome! Please:
 
 ## License
 
-This project is open source. Please check the repository for license details.
+This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE) for details.
 
 ## Related Projects
 
