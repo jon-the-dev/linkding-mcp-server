@@ -1,10 +1,6 @@
-"""MCP server factory — registers all LinkDing tools with FastMCP.
+"""MCP server factory — registers all LinkDing tools with FastMCP."""
 
-Cyclomatic complexity here is intentionally high; issue #2 will extract
-individual tools into separate modules.
-"""
-
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import httpx
 from fastmcp import FastMCP
@@ -13,39 +9,31 @@ from linkding_mcp_server.client import LinkDingClient, handle_api_error
 from linkding_mcp_server.config import Settings
 from linkding_mcp_server.models import Bookmark, BookmarkCheck, BookmarkList, TagList
 
+_DESTRUCTIVE_ERROR = (
+    "Error: Destructive actions are disabled for security. "
+    "To enable bookmark modifications, set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true "
+    "in your environment variables or .env file. "
+    "This includes: add, update, delete, archive, and unarchive operations."
+)
 
-def create_mcp_server(settings: Settings) -> FastMCP:
-    """Build and return a configured FastMCP instance with all tools registered.
+
+def _destructive_guard(settings: Settings) -> Callable[[], str]:
+    """Return a function that yields an error string if destructive actions are disabled, else ''.
 
     Args:
-        settings: Runtime configuration for the LinkDing connection.
+        settings: Runtime configuration containing the destructive-actions flag.
 
     Returns:
-        A FastMCP server with all 11 bookmark tools registered.
+        A zero-argument callable returning an error string or empty string.
     """
-    client = LinkDingClient(settings)
-
-    mcp = FastMCP(
-        name="LinkDing MCP Server",
-        instructions="""
-        This server provides tools for interacting with a LinkDing bookmark manager.
-        You can search for bookmarks, add new ones, manage tags, and perform various
-        bookmark operations. All operations require a valid LinkDing API token.
-        """,
-    )
-
-    def check_destructive_actions_enabled() -> str:
-        """Return an error string if destructive actions are disabled, else empty string."""
+    def check() -> str:
         if not settings.enable_destructive_actions:
-            return (
-                "Error: Destructive actions are disabled for security. "
-                "To enable bookmark modifications, set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true "
-                "in your environment variables or .env file. "
-                "This includes: add, update, delete, archive, and unarchive operations."
-            )
+            return _DESTRUCTIVE_ERROR
         return ""
+    return check
 
-    @mcp.tool
+
+def _build_search_bookmarks(client: LinkDingClient) -> Callable:
     async def search_bookmarks(
         query: Optional[str] = None,
         tag: Optional[str] = None,
@@ -97,7 +85,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error searching bookmarks: {str(e)}"
 
-    @mcp.tool
+    return search_bookmarks
+
+
+def _build_add_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
     async def add_bookmark(
         url: str,
         title: Optional[str] = None,
@@ -123,7 +114,7 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         Returns:
             JSON string containing the created bookmark data
         """
-        security_error = check_destructive_actions_enabled()
+        security_error = guard()
         if security_error:
             return security_error
 
@@ -151,7 +142,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error adding bookmark: {str(e)}"
 
-    @mcp.tool
+    return add_bookmark
+
+
+def _build_get_bookmark(client: LinkDingClient) -> Callable:
     async def get_bookmark(bookmark_id: int) -> str:
         """Retrieve a specific bookmark by its ID.
 
@@ -177,7 +171,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error retrieving bookmark: {str(e)}"
 
-    @mcp.tool
+    return get_bookmark
+
+
+def _build_update_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
     async def update_bookmark(
         bookmark_id: int,
         url: Optional[str] = None,
@@ -205,7 +202,7 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         Returns:
             JSON string containing the updated bookmark data
         """
-        security_error = check_destructive_actions_enabled()
+        security_error = guard()
         if security_error:
             return security_error
 
@@ -246,7 +243,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error updating bookmark: {str(e)}"
 
-    @mcp.tool
+    return update_bookmark
+
+
+def _build_delete_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
     async def delete_bookmark(bookmark_id: int) -> str:
         """Delete a bookmark by its ID.
 
@@ -256,7 +256,7 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         Returns:
             Success or error message
         """
-        security_error = check_destructive_actions_enabled()
+        security_error = guard()
         if security_error:
             return security_error
 
@@ -275,7 +275,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error deleting bookmark: {str(e)}"
 
-    @mcp.tool
+    return delete_bookmark
+
+
+def _build_archive_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
     async def archive_bookmark(bookmark_id: int) -> str:
         """Archive a bookmark by its ID.
 
@@ -285,7 +288,7 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         Returns:
             Success or error message
         """
-        security_error = check_destructive_actions_enabled()
+        security_error = guard()
         if security_error:
             return security_error
 
@@ -304,7 +307,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error archiving bookmark: {str(e)}"
 
-    @mcp.tool
+    return archive_bookmark
+
+
+def _build_unarchive_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
     async def unarchive_bookmark(bookmark_id: int) -> str:
         """Unarchive a bookmark by its ID.
 
@@ -314,7 +320,7 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         Returns:
             Success or error message
         """
-        security_error = check_destructive_actions_enabled()
+        security_error = guard()
         if security_error:
             return security_error
 
@@ -333,7 +339,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error unarchiving bookmark: {str(e)}"
 
-    @mcp.tool
+    return unarchive_bookmark
+
+
+def _build_check_url(client: LinkDingClient) -> Callable:
     async def check_url(url: str) -> str:
         """Check if a URL is already bookmarked and get metadata.
 
@@ -357,7 +366,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error checking URL: {str(e)}"
 
-    @mcp.tool
+    return check_url
+
+
+def _build_list_tags(client: LinkDingClient) -> Callable:
     async def list_tags(limit: int = 100, offset: int = 0) -> str:
         """List all available tags.
 
@@ -382,7 +394,10 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         except Exception as e:
             return f"Error listing tags: {str(e)}"
 
-    @mcp.tool
+    return list_tags
+
+
+def _build_list_bookmarks_by_tag(search_fn: Callable) -> Callable:
     async def list_bookmarks_by_tag(tag_name: str, limit: int = 100, offset: int = 0) -> str:
         """List bookmarks filtered by a specific tag.
 
@@ -395,8 +410,53 @@ def create_mcp_server(settings: Settings) -> FastMCP:
             JSON string containing bookmarks with the specified tag
         """
         try:
-            return await search_bookmarks(tag=tag_name, limit=limit, offset=offset)
+            return await search_fn(tag=tag_name, limit=limit, offset=offset)
         except Exception as e:
             return f"Error listing bookmarks by tag: {str(e)}"
 
+    return list_bookmarks_by_tag
+
+
+def register_tools(mcp: FastMCP, client: LinkDingClient, settings: Settings) -> None:
+    """Register all 11 LinkDing tools with the given FastMCP instance.
+
+    Args:
+        mcp: The FastMCP server to register tools on.
+        client: The LinkDing HTTP client shared across all tools.
+        settings: Runtime configuration (used to build the destructive-action guard).
+    """
+    guard = _destructive_guard(settings)
+    search_fn = _build_search_bookmarks(client)
+
+    mcp.tool(search_fn)
+    mcp.tool(_build_add_bookmark(client, guard))
+    mcp.tool(_build_get_bookmark(client))
+    mcp.tool(_build_update_bookmark(client, guard))
+    mcp.tool(_build_delete_bookmark(client, guard))
+    mcp.tool(_build_archive_bookmark(client, guard))
+    mcp.tool(_build_unarchive_bookmark(client, guard))
+    mcp.tool(_build_check_url(client))
+    mcp.tool(_build_list_tags(client))
+    mcp.tool(_build_list_bookmarks_by_tag(search_fn))
+
+
+def create_mcp_server(settings: Settings) -> FastMCP:
+    """Build and return a configured FastMCP instance with all tools registered.
+
+    Args:
+        settings: Runtime configuration for the LinkDing connection.
+
+    Returns:
+        A FastMCP server with all 11 bookmark tools registered.
+    """
+    client = LinkDingClient(settings)
+    mcp = FastMCP(
+        name="LinkDing MCP Server",
+        instructions="""
+        This server provides tools for interacting with a LinkDing bookmark manager.
+        You can search for bookmarks, add new ones, manage tags, and perform various
+        bookmark operations. All operations require a valid LinkDing API token.
+        """,
+    )
+    register_tools(mcp, client, settings)
     return mcp
