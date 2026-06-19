@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-"""
-Setup script for LinkDing MCP Server
-
-This script helps users set up the LinkDing MCP server quickly.
-"""
+"""Interactive setup helper for the LinkDing MCP Server."""
 
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
+
 def check_python_version():
-    """Check if Python version is 3.12 or higher"""
+    """Check if Python version is 3.12 or higher."""
     if sys.version_info < (3, 12):
         print("❌ Python 3.12 or higher is required")
         print(f"Current version: {sys.version}")
@@ -19,90 +16,77 @@ def check_python_version():
     print(f"✅ Python version: {sys.version.split()[0]}")
     return True
 
+
 def install_dependencies():
-    """Install required dependencies"""
+    """Install required dependencies."""
     print("\n📦 Installing dependencies...")
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "linkding-mcp-server"])
         print("✅ Dependencies installed successfully")
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Failed to install dependencies: {e}")
         return False
 
+
 def setup_environment():
-    """Set up environment file"""
+    """Set up environment file interactively."""
     env_file = Path(".env")
-    env_sample = Path(".env.sample")
-    
+
     if env_file.exists():
         print("✅ .env file already exists")
         return True
-    
-    if not env_sample.exists():
-        print("❌ .env.sample file not found")
-        return False
-    
+
     print("\n🔧 Setting up environment file...")
-    
-    # Copy sample to .env
-    with open(env_sample, 'r') as f:
-        content = f.read()
-    
     print("Please provide the following information:")
-    
-    # Get LinkDing URL
+
     linkding_url = input("LinkDing URL (default: http://127.0.0.1:9090): ").strip()
     if not linkding_url:
         linkding_url = "http://127.0.0.1:9090"
-    
-    # Get API token
+
     api_token = input("LinkDing API Token (required): ").strip()
     if not api_token:
         print("❌ API token is required")
         return False
-    
-    # Get debug setting
+
     debug = input("Enable debug mode? (y/N): ").strip().lower()
-    debug_value = "true" if debug in ['y', 'yes'] else "false"
-    
-    # Replace placeholders
-    content = content.replace("http://127.0.0.1:9090", linkding_url)
-    content = content.replace("your_api_token_here", api_token)
-    content = content.replace("false", debug_value)
-    
-    # Write .env file
-    with open(env_file, 'w') as f:
-        f.write(content)
-    
+    debug_value = "true" if debug in ["y", "yes"] else "false"
+
+    content = (
+        f"LINKDING_URL={linkding_url}\n"
+        f"LINKDING_API_TOKEN={api_token}\n"
+        f"DEBUG={debug_value}\n"
+        "LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=false\n"
+    )
+
+    env_file.write_text(content)
     print("✅ Environment file created")
     return True
 
+
 def test_connection():
-    """Test connection to LinkDing server"""
+    """Test connection to the LinkDing server."""
     print("\n🔍 Testing connection to LinkDing server...")
     try:
-        # Import here to avoid issues if dependencies aren't installed yet
         import httpx
         from dotenv import load_dotenv
-        
+
         load_dotenv()
-        
+
         linkding_url = os.getenv("LINKDING_URL", "http://127.0.0.1:9090")
         api_token = os.getenv("LINKDING_API_TOKEN")
-        
+
         if not api_token:
             print("❌ API token not found in environment")
             return False
-        
-        # Test API connection
+
         with httpx.Client(
             base_url=f"{linkding_url.rstrip('/')}/api",
             headers={"Authorization": f"Token {api_token}"},
-            timeout=10.0
-        ) as client:
-            response = client.get("/tags/", params={"limit": 1})
-            
+            timeout=10.0,
+        ) as http:
+            response = http.get("/tags/", params={"limit": 1})
+
             if response.status_code == 200:
                 print("✅ Successfully connected to LinkDing server")
                 return True
@@ -112,40 +96,37 @@ def test_connection():
             else:
                 print(f"❌ Connection failed with status {response.status_code}")
                 return False
-                
+
     except ImportError:
         print("⚠️  Cannot test connection - dependencies not installed")
-        return True  # Don't fail setup for this
+        return True
     except Exception as e:
         print(f"❌ Connection test failed: {e}")
         return False
 
+
 def main():
-    """Main setup function"""
+    """Run the interactive LinkDing MCP Server setup."""
     print("🚀 LinkDing MCP Server Setup")
     print("=" * 30)
-    
-    # Check Python version
+
     if not check_python_version():
         sys.exit(1)
-    
-    # Install dependencies
+
     if not install_dependencies():
         sys.exit(1)
-    
-    # Setup environment
+
     if not setup_environment():
         sys.exit(1)
-    
-    # Test connection
+
     test_connection()
-    
+
     print("\n🎉 Setup completed!")
     print("\nNext steps:")
-    print("1. Run the server: python linkding_server.py")
-    print("2. Or use FastMCP CLI: fastmcp run linkding_server.py")
-    print("3. Test with: python test_server.py")
+    print("1. Run the server: linkding-mcp-server")
+    print("2. Or: python -m linkding_mcp_server.server")
     print("\nFor Claude Desktop integration, see README.md")
+
 
 if __name__ == "__main__":
     main()
