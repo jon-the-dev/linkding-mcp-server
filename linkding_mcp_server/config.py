@@ -100,21 +100,3 @@ class Settings(BaseSettings):
     def get_log_level_int(self) -> int:
         """Get log level as integer for tenacity compatibility"""
         return getattr(logging, self.log_level, logging.INFO)
-
-
-# Singleton instance
-_settings: Settings | None = None
-
-
-def get_settings() -> Settings:
-    """Get or create settings instance"""
-    global _settings
-    if _settings is None:
-        _settings = Settings()
-    return _settings
-
-
-def reset_settings() -> None:
-    """Reset settings singleton (useful for testing)"""
-    global _settings
-    _settings = None

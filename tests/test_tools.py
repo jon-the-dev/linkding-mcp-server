@@ -6,7 +6,7 @@ import pytest
 from fastmcp import Client
 
 from linkding_mcp_server import tools
-from linkding_mcp_server.config import reset_settings
+from linkding_mcp_server.config import Settings
 from linkding_mcp_server.models import Tag, TagList
 from linkding_mcp_server.tools import create_mcp_server
 
@@ -24,14 +24,10 @@ EXPECTED_TOOLS = {
 }
 
 
-@pytest.fixture(autouse=True)
-def _env(monkeypatch):
-    """Provide a valid token so get_settings() succeeds, and reset the singleton."""
-    monkeypatch.setenv("LINKDING_API_TOKEN", "test_token_12345")
-    monkeypatch.delenv("LINKDING_ENABLE_DESTRUCTIVE_ACTIONS", raising=False)
-    reset_settings()
-    yield
-    reset_settings()
+@pytest.fixture
+def settings():
+    """Settings injected explicitly into create_mcp_server (no global singleton)."""
+    return Settings(linkding_api_token="test_token_12345", enable_destructive_actions=False)
 
 
 def _patch_client(monkeypatch, fake):
@@ -45,23 +41,23 @@ def _patch_client(monkeypatch, fake):
 
 
 @pytest.mark.asyncio
-async def test_all_tools_registered():
-    mcp = create_mcp_server()
+async def test_all_tools_registered(settings):
+    mcp = create_mcp_server(settings)
     async with Client(mcp) as client:
         names = {tool.name for tool in await client.list_tools()}
     assert EXPECTED_TOOLS.issubset(names)
 
 
 @pytest.mark.asyncio
-async def test_destructive_action_blocked_by_default():
-    mcp = create_mcp_server()
+async def test_destructive_action_blocked_by_default(settings):
+    mcp = create_mcp_server(settings)
     async with Client(mcp) as client:
         result = await client.call_tool("add_bookmark", {"url": "https://example.com"})
     assert "Destructive actions are disabled" in result.content[0].text
 
 
 @pytest.mark.asyncio
-async def test_list_tags_happy_path(monkeypatch):
+async def test_list_tags_happy_path(monkeypatch, settings):
     class FakeClient:
         async def get_tags(self, limit, offset):
             return TagList(
@@ -72,15 +68,15 @@ async def test_list_tags_happy_path(monkeypatch):
             )
 
     _patch_client(monkeypatch, FakeClient())
-    mcp = create_mcp_server()
+    mcp = create_mcp_server(settings)
     async with Client(mcp) as client:
         result = await client.call_tool("list_tags", {"limit": 10})
     assert '"name": "python"' in result.content[0].text
 
 
 @pytest.mark.asyncio
-async def test_list_tags_validates_limit():
-    mcp = create_mcp_server()
+async def test_list_tags_validates_limit(settings):
+    mcp = create_mcp_server(settings)
     async with Client(mcp) as client:
         result = await client.call_tool("list_tags", {"limit": 0})
     assert "limit must be between 1 and 1000" in result.content[0].text

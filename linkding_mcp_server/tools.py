@@ -4,7 +4,7 @@ import structlog
 from fastmcp import FastMCP
 
 from .client import LinkDingClient, LinkDingError
-from .config import get_settings
+from .config import Settings
 from .models import BookmarkCreate, BookmarkUpdate, SearchParams
 
 # Configure structured logging
@@ -490,11 +490,15 @@ def register_tools(mcp: FastMCP, settings) -> None:
     mcp.tool(_build_list_bookmarks_by_tag(settings, search_bookmarks))
 
 
-def create_mcp_server() -> FastMCP:
-    """Create and configure the MCP server with all tools"""
-    # Get settings lazily when server is created
-    settings = get_settings()
+def create_mcp_server(settings: Settings) -> FastMCP:
+    """Create and configure the MCP server with all tools.
 
+    Args:
+        settings: Runtime configuration injected by the caller.
+
+    Returns:
+        A configured FastMCP server with all tools registered.
+    """
     mcp = FastMCP(
         name="LinkDing MCP Server",
         instructions="""

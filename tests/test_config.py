@@ -3,15 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from linkding_mcp_server.config import Settings, get_settings, reset_settings
-
-
-@pytest.fixture(autouse=True)
-def reset_settings_singleton():
-    """Reset settings singleton before and after each test"""
-    reset_settings()
-    yield
-    reset_settings()
+from linkding_mcp_server.config import Settings
 
 
 class TestSettings:
@@ -288,19 +280,29 @@ class TestSSLEnvVars:
         assert settings.ssl_cert_path is None
 
 
-class TestGetSettings:
-    """Tests for get_settings singleton"""
+class TestDependencyInjection:
+    """Settings are constructed explicitly; there is no global singleton."""
 
-    def test_singleton_pattern(self, monkeypatch):
-        """Test that get_settings returns the same instance"""
-        monkeypatch.setenv("LINKDING_API_TOKEN", "singleton_token")
+    def test_no_global_settings_accessor(self):
+        """The removed singleton helpers must not be importable."""
+        import linkding_mcp_server.config as config
 
-        settings1 = get_settings()
-        settings2 = get_settings()
-        assert settings1 is settings2
+        assert not hasattr(config, "get_settings")
+        assert not hasattr(config, "reset_settings")
+        assert not hasattr(config, "_settings")
 
-    def test_settings_initialization(self, monkeypatch):
-        """Test settings initialization from environment"""
-        monkeypatch.setenv("LINKDING_API_TOKEN", "singleton_token")
-        settings = get_settings()
-        assert settings.linkding_api_token == "singleton_token"
+    def test_each_instance_is_independent(self, monkeypatch):
+        """Constructing Settings twice yields distinct, isolated instances."""
+        monkeypatch.setenv("LINKDING_API_TOKEN", "di_token")
+
+        first = Settings()
+        second = Settings()
+        assert first is not second
+        assert first.linkding_api_token == "di_token"
+
+    def test_explicit_values_override_environment(self, monkeypatch):
+        """Explicit constructor args do not depend on any shared state."""
+        monkeypatch.setenv("LINKDING_API_TOKEN", "env_token")
+
+        settings = Settings(linkding_api_token="explicit_token")
+        assert settings.linkding_api_token == "explicit_token"
