@@ -24,24 +24,9 @@ def check_destructive_actions_enabled(settings) -> str | None:
     return None
 
 
-def create_mcp_server() -> FastMCP:
-    """Create and configure the MCP server with all tools"""
-    # Get settings lazily when server is created
-    settings = get_settings()
+def _build_search_bookmarks(settings):
+    """Build the search_bookmarks tool bound to the given settings."""
 
-    mcp = FastMCP(
-        name="LinkDing MCP Server",
-        instructions="""
-        This server provides tools for interacting with a LinkDing bookmark manager.
-        You can search for bookmarks, add new ones, manage tags, and perform various
-        bookmark operations. All operations require a valid LinkDing API token.
-
-        Security Note: Write operations (add, update, delete) are disabled by default.
-        Enable them by setting LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true.
-        """,
-    )
-
-    @mcp.tool
     async def search_bookmarks(
         query: str | None = None,
         tag: str | None = None,
@@ -102,7 +87,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error searching bookmarks: {str(e)}"
 
-    @mcp.tool
+    return search_bookmarks
+
+
+def _build_add_bookmark(settings):
+    """Build the add_bookmark tool bound to the given settings."""
+
     async def add_bookmark(
         url: str,
         title: str | None = None,
@@ -162,7 +152,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error adding bookmark: {str(e)}"
 
-    @mcp.tool
+    return add_bookmark
+
+
+def _build_get_bookmark(settings):
+    """Build the get_bookmark tool bound to the given settings."""
+
     async def get_bookmark(bookmark_id: int) -> str:
         """
         Retrieve a specific bookmark by its ID.
@@ -189,7 +184,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error retrieving bookmark: {str(e)}"
 
-    @mcp.tool
+    return get_bookmark
+
+
+def _build_update_bookmark(settings):
+    """Build the update_bookmark tool bound to the given settings."""
+
     async def update_bookmark(
         bookmark_id: int,
         url: str | None = None,
@@ -251,7 +251,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error updating bookmark: {str(e)}"
 
-    @mcp.tool
+    return update_bookmark
+
+
+def _build_delete_bookmark(settings):
+    """Build the delete_bookmark tool bound to the given settings."""
+
     async def delete_bookmark(bookmark_id: int) -> str:
         """
         Delete a bookmark by its ID.
@@ -283,7 +288,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error deleting bookmark: {str(e)}"
 
-    @mcp.tool
+    return delete_bookmark
+
+
+def _build_archive_bookmark(settings):
+    """Build the archive_bookmark tool bound to the given settings."""
+
     async def archive_bookmark(bookmark_id: int) -> str:
         """
         Archive a bookmark by its ID.
@@ -315,7 +325,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error archiving bookmark: {str(e)}"
 
-    @mcp.tool
+    return archive_bookmark
+
+
+def _build_unarchive_bookmark(settings):
+    """Build the unarchive_bookmark tool bound to the given settings."""
+
     async def unarchive_bookmark(bookmark_id: int) -> str:
         """
         Unarchive a bookmark by its ID.
@@ -347,7 +362,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error unarchiving bookmark: {str(e)}"
 
-    @mcp.tool
+    return unarchive_bookmark
+
+
+def _build_check_url(settings):
+    """Build the check_url tool bound to the given settings."""
+
     async def check_url(url: str) -> str:
         """
         Check if a URL is already bookmarked and get metadata.
@@ -379,7 +399,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error checking URL: {str(e)}"
 
-    @mcp.tool
+    return check_url
+
+
+def _build_list_tags(settings):
+    """Build the list_tags tool bound to the given settings."""
+
     async def list_tags(limit: int = 100, offset: int = 0) -> str:
         """
         List all available tags.
@@ -413,7 +438,12 @@ def create_mcp_server() -> FastMCP:
             log.error("unexpected_error", error=str(e))
             return f"Error listing tags: {str(e)}"
 
-    @mcp.tool
+    return list_tags
+
+
+def _build_list_bookmarks_by_tag(settings, search_bookmarks):
+    """Build the list_bookmarks_by_tag tool, delegating to the search_bookmarks tool."""
+
     async def list_bookmarks_by_tag(tag_name: str, limit: int = 100, offset: int = 0) -> str:
         """
         List bookmarks filtered by a specific tag.
@@ -436,5 +466,47 @@ def create_mcp_server() -> FastMCP:
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error listing bookmarks by tag: {str(e)}"
+
+    return list_bookmarks_by_tag
+
+
+def register_tools(mcp: FastMCP, settings) -> None:
+    """Register all LinkDing tools on the given MCP server.
+
+    Args:
+        mcp: The FastMCP server to register tools on.
+        settings: Runtime settings shared by every tool.
+    """
+    search_bookmarks = _build_search_bookmarks(settings)
+    mcp.tool(search_bookmarks)
+    mcp.tool(_build_add_bookmark(settings))
+    mcp.tool(_build_get_bookmark(settings))
+    mcp.tool(_build_update_bookmark(settings))
+    mcp.tool(_build_delete_bookmark(settings))
+    mcp.tool(_build_archive_bookmark(settings))
+    mcp.tool(_build_unarchive_bookmark(settings))
+    mcp.tool(_build_check_url(settings))
+    mcp.tool(_build_list_tags(settings))
+    mcp.tool(_build_list_bookmarks_by_tag(settings, search_bookmarks))
+
+
+def create_mcp_server() -> FastMCP:
+    """Create and configure the MCP server with all tools"""
+    # Get settings lazily when server is created
+    settings = get_settings()
+
+    mcp = FastMCP(
+        name="LinkDing MCP Server",
+        instructions="""
+        This server provides tools for interacting with a LinkDing bookmark manager.
+        You can search for bookmarks, add new ones, manage tags, and perform various
+        bookmark operations. All operations require a valid LinkDing API token.
+
+        Security Note: Write operations (add, update, delete) are disabled by default.
+        Enable them by setting LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true.
+        """,
+    )
+
+    register_tools(mcp, settings)
 
     return mcp
