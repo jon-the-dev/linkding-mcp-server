@@ -1,58 +1,103 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "linkding-mcp-server"
-version = "0.1.0"
-description = "An MCP server for interacting with the LinkDing bookmark manager"
+version = "1.0.0"
+description = "A Model Context Protocol server for interacting with LinkDing bookmark manager"
 readme = "README.md"
-requires-python = ">=3.12"
-license = {text = "AGPL-3.0-or-later"}
 authors = [
-    {name = "Jon Price", email = "jon@jonprice.io"},
+    { name = "Jon Price", email = "jon@jonprice.io" }
 ]
-keywords = ["mcp", "linkding", "bookmarks", "llm", "claude"]
+license = { text = "AGPL-3.0" }
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "linkding",
+    "bookmarks",
+    "claude",
+    "llm",
+    "ai-tools",
+]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-    "Topic :: Internet :: WWW/HTTP",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Framework :: FastAPI",
+    "Typing :: Typed",
 ]
+requires-python = ">=3.12"
 dependencies = [
-    "fastmcp>=3.3.1",
+    "fastmcp>=2.8.0",
     "httpx>=0.25.0",
-    "python-dotenv>=1.2.2",
-    "pydantic>=2.13.4",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "tenacity>=8.2.0",
+    "structlog>=24.0.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/jon-the-dev/linkding-mcp-server"
-Repository = "https://github.com/jon-the-dev/linkding-mcp-server"
-
-[project.scripts]
-linkding-mcp-server = "linkding_mcp_server.server:main"
-linkding-mcp-setup = "linkding_mcp_server.setup:main"
+Issues = "https://github.com/jon-the-dev/linkding-mcp-server/issues"
+Documentation = "https://github.com/jon-the-dev/linkding-mcp-server#readme"
+Repository = "https://github.com/jon-the-dev/linkding-mcp-server.git"
+Changelog = "https://github.com/jon-the-dev/linkding-mcp-server/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8",
-    "pytest-asyncio>=0.23",
-    "ruff>=0.6",
-    "build>=1.2",
-    "respx>=0.21",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.11.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "types-python-dateutil",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["linkding_mcp_server*"]
+[project.scripts]
+linkding-mcp = "linkding_mcp_server.cli:main"
+linkding-mcp-server = "linkding_mcp_server.cli:main"
+linkding-mcp-setup = "linkding_mcp_server.setup:main"
 
-[tool.ruff]
-line-length = 100
-select = ["E", "F", "I"]
-ignore = ["E501"]
+[tool.hatch.build.targets.sdist]
+include = [
+    "linkding_mcp_server/",
+    "README.md",
+    "LICENSE",
+    ".env.sample",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["linkding_mcp_server"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
+minversion = "6.0"
+addopts = "-ra -q"
 testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+select = ["E", "F", "B", "I", "N", "UP", "C90"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

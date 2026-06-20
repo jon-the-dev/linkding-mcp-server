@@ -6,96 +6,41 @@ Get up and running with the LinkDing MCP Server in minutes.
 
 Before starting, ensure you have:
 
-- ✅ Python 3.12+ installed
-- ✅ LinkDing instance running
-- ✅ LinkDing API token ready
+- Python 3.12+ installed
+- LinkDing instance running
+- LinkDing API token ready
 
 ## 5-Minute Setup
 
-### 1. Install and Configure
+### 1. Install the Package
 
 ```bash
-# Clone and enter directory
-git clone <repository-url>
-cd linkding-mcp-server
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.sample .env
-# Edit .env with your LinkDing URL and API token
-# Set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true to allow bookmark modifications
+pip install linkding-mcp-server
 ```
+
+### 2. Run the Setup Wizard
+
+```bash
+linkding-mcp-setup
+```
+
+Follow the prompts to configure your LinkDing connection. The wizard will:
+
+- Ask for your LinkDing URL (e.g., `http://127.0.0.1:9090`)
+- Ask for your API token
+- Optionally enable destructive actions (add/update/delete)
+- Test the connection
 
 !!! info "Security Feature"
-    By default, the server operates in **read-only mode** for security. You can search and view bookmarks, but cannot add, update, or delete them. To enable full functionality, set `LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true` in your `.env` file.
-
-### 2. Test Connection
-
-```bash
-python test_server.py
-```
-
-You should see output like:
-```
-✅ Environment variables loaded
-✅ Connected to LinkDing
-✅ API token is valid
-✅ Basic functionality working
-```
+    By default, the server operates in **read-only mode** for security. You can search and view bookmarks, but cannot add, update, or delete them. To enable full functionality, answer "yes" when asked about destructive actions during setup.
 
 ### 3. Start the Server
 
 ```bash
-python linkding_server.py
+linkding-mcp
 ```
 
-The server will start and display available tools.
-
-## First Steps with the Server
-
-Once running, the server provides these tools for LLM interaction:
-
-### Search Your Bookmarks
-
-```python
-# Search for bookmarks about Python
-search_bookmarks(query="python")
-
-# Find bookmarks with specific tags
-search_bookmarks(tag="tutorial")
-
-# Search archived bookmarks
-search_bookmarks(archived=True, limit=10)
-```
-
-### Add a New Bookmark
-
-```python
-# Simple bookmark
-add_bookmark(url="https://example.com")
-
-# Bookmark with details
-add_bookmark(
-    url="https://python.org",
-    title="Python Official Site",
-    tags=["python", "programming"],
-    notes="Official Python documentation and downloads"
-)
-```
-
-### Check if URL is Already Bookmarked
-
-```python
-check_url(url="https://github.com")
-```
-
-### List Your Tags
-
-```python
-list_tags()
-```
+The server will start and be ready for MCP client connections.
 
 ## Integration with Claude Desktop
 
@@ -109,11 +54,11 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "linkding": {
-      "command": "python",
-      "args": ["/path/to/linkding-mcp-server/linkding_server.py"],
+      "command": "linkding-mcp",
       "env": {
         "LINKDING_URL": "http://127.0.0.1:9090",
-        "LINKDING_API_TOKEN": "your_api_token_here"
+        "LINKDING_API_TOKEN": "your_api_token_here",
+        "LINKDING_ENABLE_DESTRUCTIVE_ACTIONS": "true"
       }
     }
   }
@@ -126,100 +71,82 @@ Edit `%APPDATA%/Claude/claude_desktop_config.json` with the same content.
 
 After adding the configuration, restart Claude Desktop.
 
-## Example Usage Scenarios
+## Integration with Claude Code
 
-### Scenario 1: Research Session
+Add to your Claude Code MCP settings (`~/.claude.json`):
 
-```python
-# Check if you've already bookmarked a site
-check_url(url="https://research-site.com")
-
-# Add it if not already bookmarked
-add_bookmark(
-    url="https://research-site.com",
-    title="Important Research Paper",
-    tags=["research", "ai", "papers"],
-    notes="Key findings about neural networks"
-)
-
-# Find related bookmarks
-search_bookmarks(tag="research")
+```json
+{
+  "mcpServers": {
+    "linkding": {
+      "command": "linkding-mcp",
+      "env": {
+        "LINKDING_URL": "http://127.0.0.1:9090",
+        "LINKDING_API_TOKEN": "your_api_token_here",
+        "LINKDING_ENABLE_DESTRUCTIVE_ACTIONS": "true"
+      }
+    }
+  }
+}
 ```
 
-### Scenario 2: Organizing Bookmarks
+## Try It Out
 
-```python
-# Find all untagged bookmarks
-search_bookmarks(query="", limit=50)
+Once integrated with Claude, try these example prompts:
 
-# Update a bookmark with tags
-update_bookmark(
-    bookmark_id=123,
-    tags=["web-dev", "javascript", "tutorial"]
-)
+### Search Your Bookmarks
 
-# Archive old bookmarks
-archive_bookmark(bookmark_id=456)
-```
+> "Search my bookmarks for Python tutorials"
 
-### Scenario 3: Content Discovery
+> "What bookmarks do I have tagged with 'react'?"
 
-```python
-# List all your tags to see what you've collected
-list_tags()
+> "Find my unread bookmarks"
 
-# Explore bookmarks by category
-list_bookmarks_by_tag(tag_name="tutorials")
+### Add New Bookmarks
 
-# Find bookmarks you haven't read yet
-search_bookmarks(unread_only=True)
-```
+> "Bookmark https://docs.python.org with tags python and documentation"
 
-## Common Workflows
+> "Save this article for later: https://example.com/great-article"
 
-### Daily Bookmark Management
+### Organize Bookmarks
 
-1. **Morning Review**: Check unread bookmarks
-   ```python
-   search_bookmarks(unread_only=True, limit=10)
-   ```
+> "List all my tags"
 
-2. **Add New Finds**: Bookmark interesting sites
-   ```python
-   add_bookmark(url="https://new-site.com", tags=["to-read"])
-   ```
+> "Archive the bookmark about old JavaScript frameworks"
 
-3. **Evening Cleanup**: Archive or tag processed bookmarks
-   ```python
-   update_bookmark(bookmark_id=123, tags=["processed", "useful"])
-   archive_bookmark(bookmark_id=124)
-   ```
+> "What tutorials have I saved but not read yet?"
 
-### Research Project Organization
+### Check for Duplicates
 
-1. **Create Project Tags**: Use consistent tagging
-   ```python
-   add_bookmark(url="...", tags=["project-alpha", "research"])
-   ```
+> "Is https://github.com already in my bookmarks?"
 
-2. **Find Project Resources**: Search by project tag
-   ```python
-   list_bookmarks_by_tag(tag_name="project-alpha")
-   ```
+> "Check if I've already saved this URL: https://example.com"
 
-3. **Archive Completed Projects**: Clean up when done
-   ```python
-   search_bookmarks(tag="project-alpha")
-   # Then archive each bookmark
-   ```
+## Available Tools
+
+The server provides these tools for LLM interaction:
+
+| Tool | Description |
+|------|-------------|
+| `search_bookmarks` | Search bookmarks with filters |
+| `add_bookmark` | Add new bookmarks |
+| `get_bookmark` | Retrieve bookmark by ID |
+| `update_bookmark` | Update existing bookmarks |
+| `delete_bookmark` | Delete bookmarks |
+| `archive_bookmark` | Archive bookmarks |
+| `unarchive_bookmark` | Unarchive bookmarks |
+| `check_url` | Check if URL is bookmarked |
+| `list_tags` | List all available tags |
+| `list_bookmarks_by_tag` | Filter bookmarks by tag |
 
 ## Troubleshooting Quick Fixes
 
 ### Server Won't Start
 
 ```bash
-# Check environment variables
-cat .env
+# Check environment variables are set
+echo $LINKDING_URL
+echo $LINKDING_API_TOKEN
 
 # Verify LinkDing is running
 curl http://127.0.0.1:9090/api/bookmarks/ -H "Authorization: Token YOUR_TOKEN"
@@ -232,34 +159,28 @@ python --version  # Should be 3.12+
 
 ```bash
 # Enable debug mode
-echo "DEBUG=true" >> .env
-
-# Restart server to see detailed logs
-python linkding_server.py
+export LINKDING_LOG_LEVEL=DEBUG
+linkding-mcp
 ```
 
 ### Connection Issues
 
 ```bash
 # Test LinkDing connectivity
-python -c "
-import httpx
-response = httpx.get('http://127.0.0.1:9090')
-print(f'Status: {response.status_code}')
-"
+curl -I http://127.0.0.1:9090
 ```
 
 ## Next Steps
 
 Now that you're up and running:
 
-- **Explore Tools**: Check out the [Tools Reference](tools/overview.md) for detailed documentation
-- **Advanced Configuration**: Learn about [Configuration Options](configuration.md)
-- **Integration**: Set up [Claude Desktop Integration](integration/claude.md)
-- **Development**: Contribute to the project with our [Development Guide](development/contributing.md)
+- **[Example Prompts](examples/prompts.md)** - More ways to use with Claude
+- **[Tools Reference](tools/overview.md)** - Detailed tool documentation
+- **[Configuration](configuration.md)** - All configuration options
+- **[Claude Desktop Integration](integration/claude.md)** - Advanced setup
 
 ## Getting Help
 
 - **Common Issues**: Check [Troubleshooting](troubleshooting.md)
 - **Questions**: See our [FAQ](faq.md)
-- **Bugs**: Report on [GitHub Issues](https://github.com/your-username/linkding-mcp-server/issues)
+- **Bugs**: Report on [GitHub Issues](https://github.com/jon-the-dev/linkding-mcp-server/issues)

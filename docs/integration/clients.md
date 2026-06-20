@@ -35,41 +35,36 @@ FastMCP provides a command-line interface for interacting with MCP servers direc
 ### Installation
 
 ```bash
-pip install fastmcp
+pip install linkding-mcp-server
 ```
 
 ### Basic Usage
 
 ```bash
 # Run the server directly
-fastmcp run linkding_server.py
+linkding-mcp
 
 # Run with HTTP transport
-fastmcp run linkding_server.py --transport http --port 8000
+fastmcp run linkding-mcp --transport http --port 8000
 
-# Interactive mode
-fastmcp dev linkding_server.py
+# Using uv
+uv run linkding-mcp
 ```
 
 ### Configuration
 
-Create a `fastmcp.yaml` configuration file:
-
-```yaml
-servers:
-  linkding:
-    command: python
-    args: ["linkding_server.py"]
-    env:
-      LINKDING_URL: "http://127.0.0.1:9090"
-      LINKDING_API_TOKEN: "your_token_here"
-      DEBUG: "false"
-```
-
-Run with configuration:
+Set environment variables:
 
 ```bash
-fastmcp run --config fastmcp.yaml linkding
+export LINKDING_URL="http://127.0.0.1:9090"
+export LINKDING_API_TOKEN="your_token_here"
+linkding-mcp
+```
+
+Or use the setup wizard:
+
+```bash
+linkding-mcp-setup
 ```
 
 ## Continue.dev Integration
@@ -85,8 +80,7 @@ Add to your Continue configuration (`.continue/config.json`):
   "models": [...],
   "mcpServers": {
     "linkding": {
-      "command": "python",
-      "args": ["/absolute/path/to/linkding_server.py"],
+      "command": "linkding-mcp",
       "env": {
         "LINKDING_URL": "http://127.0.0.1:9090",
         "LINKDING_API_TOKEN": "your_token_here"
@@ -118,8 +112,7 @@ Add to your Zed settings (`~/.config/zed/settings.json`):
   "assistant": {
     "mcp_servers": {
       "linkding": {
-        "command": "python",
-        "args": ["/path/to/linkding_server.py"],
+        "command": "linkding-mcp",
         "env": {
           "LINKDING_URL": "http://127.0.0.1:9090",
           "LINKDING_API_TOKEN": "your_token"
@@ -146,8 +139,7 @@ Add to Cursor's MCP configuration:
 {
   "mcpServers": {
     "linkding": {
-      "command": "python",
-      "args": ["/absolute/path/to/linkding_server.py"],
+      "command": "linkding-mcp",
       "env": {
         "LINKDING_URL": "http://127.0.0.1:9090",
         "LINKDING_API_TOKEN": "your_token"
@@ -165,7 +157,7 @@ For web applications or remote access, use HTTP transport.
 
 ```bash
 # Start server with HTTP transport
-fastmcp run linkding_server.py --transport http --port 8000 --host 0.0.0.0
+fastmcp run linkding-mcp --transport http --port 8000 --host 0.0.0.0
 ```
 
 ### Client Integration
@@ -177,8 +169,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const transport = new StdioClientTransport({
-  command: 'python',
-  args: ['/path/to/linkding_server.py']
+  command: 'linkding-mcp'
 });
 
 const client = new Client({
@@ -206,8 +197,7 @@ from mcp.client.stdio import stdio_client
 
 async def main():
     server_params = StdioServerParameters(
-        command="python",
-        args=["linkding_server.py"],
+        command="linkding-mcp",
         env={
             "LINKDING_URL": "http://127.0.0.1:9090",
             "LINKDING_API_TOKEN": "your_token"
@@ -247,13 +237,12 @@ app = AsyncApp(token="your-slack-token")
 @app.command("/bookmark")
 async def bookmark_command(ack, respond, command):
     await ack()
-    
+
     url = command['text']
-    
+
     # Connect to LinkDing MCP server
     server_params = StdioServerParameters(
-        command="python",
-        args=["linkding_server.py"],
+        command="linkding-mcp",
         env={"LINKDING_URL": "...", "LINKDING_API_TOKEN": "..."}
     )
     
@@ -287,8 +276,7 @@ bot = commands.Bot(command_prefix='!')
 @bot.command(name='search')
 async def search_bookmarks(ctx, *, query):
     server_params = StdioServerParameters(
-        command="python",
-        args=["linkding_server.py"],
+        command="linkding-mcp",
         env={"LINKDING_URL": "...", "LINKDING_API_TOKEN": "..."}
     )
     

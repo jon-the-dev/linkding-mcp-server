@@ -1,76 +1,120 @@
-"""Settings and configuration for the LinkDing MCP server."""
+"""Configuration management for LinkDing MCP Server"""
 
-import os
-from typing import Optional
+import logging
+from pathlib import Path
 
-from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import AliasChoices, Field, HttpUrl, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseModel):
-    """Runtime configuration loaded from environment variables.
+class Settings(BaseSettings):
+    """Application settings with validation"""
 
-    Args:
-        linkding_url: Base URL for the LinkDing instance.
-        api_token: LinkDing API authentication token.
-        debug: Enable debug logging when True.
-        enable_destructive_actions: Allow write/delete operations when True.
-    """
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="LINKDING_",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
-    linkding_url: str = "http://127.0.0.1:9090"
-    api_token: str
-    debug: bool = False
-    enable_destructive_actions: bool = False
+    # LinkDing configuration - use validation_alias to support both prefixed and non-prefixed
+    linkding_url: HttpUrl = Field(
+        default="http://127.0.0.1:9090",
+        validation_alias=AliasChoices("url", "linkding_url"),
+        description="Base URL for LinkDing server",
+    )
+    linkding_api_token: str = Field(
+        ...,
+        validation_alias=AliasChoices("api_token", "linkding_api_token"),
+        description="API token for LinkDing authentication",
+    )
 
+    # Security settings
+    enable_destructive_actions: bool = Field(default=False, description="Enable write operations (add, update, delete)")
+    verify_ssl: bool = Field(default=True, description="Enable SSL/TLS certificate verification")
+    ssl_cert_path: str | None = Field(default=None, description="Path to custom CA bundle or certificate file")
+
+    # Request configuration
+    request_timeout: int = Field(default=30, ge=1, le=300, description="Request timeout in seconds")
+    max_retries: int = Field(default=3, ge=0, le=10, description="Maximum number of retry attempts")
+
+    # Connection pool settings
+    max_connections: int = Field(default=100, ge=1, le=1000, description="Maximum number of connections")
+    max_keepalive_connections: int = Field(
+        default=20, ge=1, le=100, description="Maximum number of keepalive connections"
+    )
+    keepalive_expiry: float = Field(default=30.0, ge=1.0, le=300.0, description="Keepalive expiry in seconds")
+
+    # Rate limiting
+    rate_limit_calls: int = Field(default=100, ge=1, le=10000, description="Number of calls allowed per period")
+    rate_limit_period: int = Field(default=60, ge=1, le=3600, description="Rate limit period in seconds")
+
+    # Cache settings
+    cache_ttl: int = Field(default=300, ge=0, le=3600, description="Cache TTL in seconds (0 to disable)")
+    cache_max_size: int = Field(
+        default=100,
+        ge=1,
+        le=10000,
+        description="Maximum number of items in cache",
+    )
+
+    # Debug settings
+    debug: bool = Field(default=False, description="Enable debug logging")
+    log_level: str = Field(default="INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR)")
+
+    @field_validator("linkding_api_token")
     @classmethod
-    def from_env(cls) -> "Settings":
-        """Build Settings from environment variables.
+    def validate_api_token(cls, v):
+        """Validate API token is not empty"""
+        if not v or v == "your_api_token_here":
+            raise ValueError("Valid LinkDing API token is required")
+        return v
 
-        Reads LINKDING_URL, LINKDING_API_TOKEN, DEBUG, and
-        LINKDING_ENABLE_DESTRUCTIVE_ACTIONS from the environment.
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, v):
+        """Validate log level"""
+        valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if v.upper() not in valid_levels:
+            raise ValueError(f"Log level must be one of {valid_levels}")
+        return v.upper()
 
-        Returns:
-            A fully configured Settings instance.
+    @field_validator("ssl_cert_path")
+    @classmethod
+    def validate_ssl_cert_path(cls, v):
+        """Validate SSL certificate path exists if provided."""
+        if v is not None:
+            cert_path = Path(v)
+            if not cert_path.exists():
+                raise ValueError(f"SSL certificate file not found: {v}")
+        return v
 
-        Raises:
-            ValueError: If LINKDING_API_TOKEN is missing or empty.
-        """
-        load_dotenv()
+    def get_masked_token(self) -> str:
+        """Return masked version of API token for logging"""
+        if not self.linkding_api_token:
+            return "None"
+        if len(self.linkding_api_token) < 8:
+            return "***"
+        return f"{self.linkding_api_token[:4]}...{self.linkding_api_token[-4:]}"
 
-        token = os.getenv("LINKDING_API_TOKEN", "").strip()
-        if not token:
-            raise ValueError("LINKDING_API_TOKEN environment variable is required")
-
-        url = os.getenv("LINKDING_URL", "http://127.0.0.1:9090").rstrip("/")
-        debug = os.getenv("DEBUG", "false").lower() == "true"
-        destructive = (
-            os.getenv("LINKDING_ENABLE_DESTRUCTIVE_ACTIONS", "false").lower() == "true"
-        )
-
-        return cls(
-            linkding_url=url,
-            api_token=token,
-            debug=debug,
-            enable_destructive_actions=destructive,
-        )
+    def get_log_level_int(self) -> int:
+        """Get log level as integer for tenacity compatibility"""
+        return getattr(logging, self.log_level, logging.INFO)
 
 
-_settings: Optional[Settings] = None
+# Singleton instance
+_settings: Settings | None = None
 
 
 def get_settings() -> Settings:
-    """Return the module-level Settings singleton, building it on first call.
-
-    Returns:
-        The shared Settings instance.
-    """
+    """Get or create settings instance"""
     global _settings
     if _settings is None:
-        _settings = Settings.from_env()
+        _settings = Settings()
     return _settings
 
 
 def reset_settings() -> None:
-    """Clear the cached settings singleton (used in tests)."""
+    """Reset settings singleton (useful for testing)"""
     global _settings
     _settings = None
