@@ -11,7 +11,7 @@ from importlib.metadata import version as pkg_version
 
 import structlog
 
-from linkding_mcp_server.config import get_settings
+from linkding_mcp_server.config import Settings
 from linkding_mcp_server.tools import create_mcp_server
 
 try:
@@ -54,8 +54,8 @@ def configure_logging(settings):
 def main():
     """Main entry point for the server"""
     try:
-        # Load settings
-        settings = get_settings()
+        # Load settings (constructed explicitly; no global singleton)
+        settings = Settings()
 
         # Configure logging
         configure_logging(settings)
@@ -71,8 +71,8 @@ def main():
             destructive_actions=settings.enable_destructive_actions,
         )
 
-        # Create MCP server
-        mcp = create_mcp_server()
+        # Create MCP server with explicitly injected settings
+        mcp = create_mcp_server(settings)
 
         # Run the server
         logger.info("server_ready")
