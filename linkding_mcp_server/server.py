@@ -1,38 +1,89 @@
-"""Entry point for the LinkDing MCP server."""
+#!/usr/bin/env python3
+"""
+LinkDing MCP Server - Main Entry Point
 
-import logging
+A Model Context Protocol server for interacting with LinkDing bookmark manager.
+"""
+
+import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
+
+import structlog
 
 from linkding_mcp_server.config import get_settings
 from linkding_mcp_server.tools import create_mcp_server
 
+try:
+    __version__ = pkg_version("linkding-mcp-server")
+except PackageNotFoundError:
+    __version__ = "dev"
 
-def main() -> None:
-    """Configure and run the LinkDing MCP server.
 
-    Reads settings from environment variables, registers all tools,
-    and starts the MCP server. Handles clean shutdown on KeyboardInterrupt.
-    """
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
+# Configure structured logging
+def configure_logging(settings):
+    """Configure structured logging based on settings"""
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.dev.ConsoleRenderer() if settings.debug else structlog.processors.JSONRenderer(),
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
 
-    settings = get_settings()
+    # Set log level
+    import logging
 
-    if settings.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
+    log_level = getattr(logging, settings.log_level, logging.INFO)
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stderr,
+        level=log_level,
+    )
 
-    mcp = create_mcp_server(settings)
 
-    logger.info("Starting LinkDing MCP Server")
-    logger.info("LinkDing URL: %s", settings.linkding_url)
-    logger.info("Debug mode: %s", settings.debug)
-
+def main():
+    """Main entry point for the server"""
     try:
+        # Load settings
+        settings = get_settings()
+
+        # Configure logging
+        configure_logging(settings)
+        logger = structlog.get_logger()
+
+        logger.info(
+            "server_starting",
+            name="LinkDing MCP Server",
+            version=__version__,
+            linkding_url=str(settings.linkding_url),
+            masked_token=settings.get_masked_token(),
+            debug_mode=settings.debug,
+            destructive_actions=settings.enable_destructive_actions,
+        )
+
+        # Create MCP server
+        mcp = create_mcp_server()
+
+        # Run the server
+        logger.info("server_ready")
         mcp.run()
+
     except KeyboardInterrupt:
-        logger.info("Server stopped by user")
+        logger.info("server_stopped", reason="user_interrupt")
+        sys.exit(0)
     except Exception as e:
-        logger.error("Server error: %s", e)
-        raise
+        logger.error("server_error", error=str(e), exc_info=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

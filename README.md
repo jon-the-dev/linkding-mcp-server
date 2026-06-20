@@ -1,5 +1,9 @@
 # LinkDing MCP Server
 
+[![PyPI version](https://badge.fury.io/py/linkding-mcp-server.svg)](https://badge.fury.io/py/linkding-mcp-server)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 A Model Context Protocol (MCP) server for interacting with [LinkDing](https://github.com/sissbruecker/linkding), the self-hosted bookmark manager. This server enables LLMs to search, add, update, and manage bookmarks through LinkDing's REST API.
 
 ## Features
@@ -19,28 +23,96 @@ A Model Context Protocol (MCP) server for interacting with [LinkDing](https://gi
 - A running LinkDing instance (local or remote)
 - LinkDing API token (available in LinkDing Settings)
 
+## Key Features
+
+- 🔒 **Security-First Design**: URL validation, token masking, optional write protection
+- 🔄 **Resilient Networking**: Automatic retry with exponential backoff
+- ⚡ **Performance Optimized**: Connection pooling, caching, rate limiting
+- 📝 **Comprehensive Validation**: Input sanitization and type checking
+- 🧪 **Well-Tested**: Unit tests with high coverage
+- 📊 **Structured Logging**: Debug-friendly with contextual information
+
 ## Installation
 
-**Install from PyPI:**
+### Quick Installation with uv (Recommended)
 
 ```bash
+# Install using uv
+uv pip install linkding-mcp-server
+
+# Or install directly from GitHub
+uv pip install git+https://github.com/jon-the-dev/linkding-mcp-server.git
+```
+
+### Installation with pip
+
+```bash
+# Install from PyPI
 pip install linkding-mcp-server
+
+# Or install from GitHub
+pip install git+https://github.com/jon-the-dev/linkding-mcp-server.git
 ```
 
-**Configure environment variables:**
+### Manual Installation from Source
 
-Create a `.env` file with your LinkDing configuration:
+1. **Clone the repository**:
 
-```env
-LINKDING_URL=http://127.0.0.1:9090
-LINKDING_API_TOKEN=your_api_token_here
-DEBUG=false
-```
+   ```bash
+   git clone https://github.com/jon-the-dev/linkding-mcp-server.git
+   cd linkding-mcp-server
+   ```
 
-Or run the interactive setup helper:
+2. **Install with uv**:
+
+   ```bash
+   uv pip install -e .
+   # For development
+   uv pip install -e ".[dev]"
+   ```
+
+   Or with pip:
+
+   ```bash
+   pip install -e .
+   # For development
+   pip install -e ".[dev]"
+   ```
+
+## Configuration
+
+### Initial Setup
+
+After installation, run the setup command to configure your LinkDing connection:
 
 ```bash
 linkding-mcp-setup
+```
+
+This will create a configuration file at `~/.linkding-mcp/config.env`.
+
+### Manual Configuration
+
+You can also configure the server using environment variables or a `.env` file:
+
+```bash
+# Create a .env file in your current directory
+cp .env.sample .env
+```
+
+Edit `.env` and set your LinkDing configuration:
+
+```env
+# Required
+LINKDING_URL=http://127.0.0.1:9090
+LINKDING_API_TOKEN=your_api_token_here
+
+# Security (important!)
+LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=false  # Set to true to allow modifications
+
+# Optional performance tuning
+LINKDING_CACHE_TTL=300
+LINKDING_MAX_CONNECTIONS=100
 ```
 
 ## Getting Your LinkDing API Token
@@ -55,22 +127,30 @@ linkding-mcp-setup
 
 ### Running the Server
 
-**Option 1: Console script (recommended)**
+**Option 1: Using the installed command (recommended)**
 
 ```bash
-linkding-mcp-server
+# Run with uv
+uv run linkding-mcp
+
+# Or if installed globally
+linkding-mcp
 ```
 
-**Option 2: Direct Python execution**
+**Option 2: Using FastMCP CLI**
 
 ```bash
-python -m linkding_mcp_server.server
+# For stdio transport (default)
+fastmcp run linkding-mcp
+
+# For HTTP transport (web deployment)
+fastmcp run linkding-mcp --transport http --port 8000
 ```
 
-**Option 3: HTTP transport for web deployment**
+**Option 3: Python module**
 
 ```bash
-fastmcp run linkding_mcp_server.server:main --transport http --port 8000
+python -m linkding_mcp_server
 ```
 
 ### Available Tools
@@ -203,7 +283,24 @@ To use this server with Claude Desktop, add it to your Claude configuration:
    {
      "mcpServers": {
        "linkding": {
-         "command": "linkding-mcp-server",
+         "command": "uv",
+         "args": ["run", "linkding-mcp"],
+         "env": {
+           "LINKDING_URL": "http://127.0.0.1:9090",
+           "LINKDING_API_TOKEN": "your_api_token_here"
+         }
+       }
+     }
+   }
+   ```
+
+   Or if you have it installed globally:
+
+   ```json
+   {
+     "mcpServers": {
+       "linkding": {
+         "command": "linkding-mcp",
          "env": {
            "LINKDING_URL": "http://127.0.0.1:9090",
            "LINKDING_API_TOKEN": "your_api_token_here"
@@ -221,20 +318,51 @@ To use this server with Claude Desktop, add it to your Claude configuration:
 
 ```
 linkding-mcp-server/
-├── linkding_mcp_server/    # Installable Python package
-│   ├── __init__.py         # Package version and exports
-│   ├── config.py           # Settings class and singleton
-│   ├── client.py           # LinkDingClient HTTP wrapper
-│   ├── models.py           # Pydantic models
-│   ├── tools.py            # MCP tool registrations
-│   ├── server.py           # main() entry point
-│   └── setup.py            # Interactive setup helper
-├── tests/                  # Test suite
-├── pyproject.toml          # Package metadata and build config
-├── requirements.txt        # Runtime dependencies
-├── .env.sample             # Environment variables template
-├── .env                    # Your local environment (not in git)
-└── README.md               # This file
+├── src/
+│   ├── __init__.py        # Package initialization
+│   ├── config.py          # Configuration management
+│   ├── models.py          # Pydantic data models
+│   ├── client.py          # HTTP client with retry logic
+│   ├── tools.py           # MCP tool implementations
+│   └── server.py          # Main server entry point
+├── tests/
+│   ├── test_models.py     # Model validation tests
+│   ├── test_client.py     # Client functionality tests
+│   └── test_config.py     # Configuration tests
+├── linkding_server.py     # Legacy entry point
+├── requirements.txt       # Production dependencies
+├── requirements-dev.txt   # Development dependencies
+├── pytest.ini            # Test configuration
+├── Makefile              # Development commands
+├── .env.sample           # Environment template
+├── .env                  # Your local config (not in git)
+└── README.md             # This file
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Run with coverage
+make test-cov
+
+# Run specific test file
+pytest tests/test_models.py
+```
+
+### Code Quality
+
+```bash
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Type checking
+make type-check
 ```
 
 ### Adding New Features
@@ -247,16 +375,49 @@ The server is built using the FastMCP framework. To add new tools:
 4. Handle errors gracefully and return meaningful messages
 5. Follow the existing patterns for API calls and response handling
 
+### Configuration Options
+
+The server supports extensive configuration through environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LINKDING_URL` | `http://127.0.0.1:9090` | LinkDing server URL |
+| `LINKDING_API_TOKEN` | Required | API authentication token |
+| `LINKDING_ENABLE_DESTRUCTIVE_ACTIONS` | `false` | Allow write operations |
+| `LINKDING_REQUEST_TIMEOUT` | `30` | Request timeout (seconds) |
+| `LINKDING_MAX_RETRIES` | `3` | Retry attempts on failure |
+| `LINKDING_CACHE_TTL` | `300` | Cache duration (seconds) |
+| `LINKDING_RATE_LIMIT_CALLS` | `100` | API calls per period |
+| `LINKDING_RATE_LIMIT_PERIOD` | `60` | Rate limit window (seconds) |
+| `LINKDING_LOG_LEVEL` | `INFO` | Logging verbosity |
+
+See `.env.sample` for complete configuration options.
+
+### Security Features
+
+- **URL Validation**: Prevents SSRF attacks through strict URL validation
+- **Token Masking**: API tokens are masked in logs and error messages
+- **Write Protection**: Destructive actions disabled by default
+- **Input Sanitization**: All inputs validated and sanitized
+- **Rate Limiting**: Prevents API abuse
+
 ### Error Handling
 
-The server includes comprehensive error handling for:
+The server includes comprehensive error handling:
 
-- Network connectivity issues
-- LinkDing API errors
-- Invalid parameters
-- Missing configuration
+- **Automatic Retry**: Network errors trigger exponential backoff retry
+- **Graceful Degradation**: Falls back to cached data when possible
+- **Detailed Logging**: Structured logs with context for debugging
+- **User-Friendly Messages**: Clear error messages without exposing sensitive data
 
-All errors are returned as descriptive strings that help users understand what went wrong.
+## Performance Optimization
+
+The server is optimized for performance:
+
+- **Connection Pooling**: Reuses HTTP connections efficiently
+- **Smart Caching**: Caches frequently accessed data like tags
+- **Async Operations**: Non-blocking I/O for better concurrency
+- **Rate Limiting**: Prevents overwhelming the LinkDing server
 
 ## Troubleshooting
 
@@ -299,7 +460,7 @@ Contributions are welcome! Please:
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE) for details.
+This project is open source. Please check the repository for license details.
 
 ## Related Projects
 

@@ -1,53 +1,62 @@
-"""MCP server factory — registers all LinkDing tools with FastMCP."""
+"""MCP tools for LinkDing server"""
 
-from typing import Callable, List, Optional
-
-import httpx
+import structlog
 from fastmcp import FastMCP
 
-from linkding_mcp_server.client import LinkDingClient, handle_api_error
-from linkding_mcp_server.config import Settings
-from linkding_mcp_server.models import Bookmark, BookmarkCheck, BookmarkList, TagList
+from .client import LinkDingClient, LinkDingError
+from .config import get_settings
+from .models import BookmarkCreate, BookmarkUpdate, SearchParams
 
-_DESTRUCTIVE_ERROR = (
-    "Error: Destructive actions are disabled for security. "
-    "To enable bookmark modifications, set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true "
-    "in your environment variables or .env file. "
-    "This includes: add, update, delete, archive, and unarchive operations."
-)
+# Configure structured logging
+logger = structlog.get_logger()
 
 
-def _destructive_guard(settings: Settings) -> Callable[[], str]:
-    """Return a function that yields an error string if destructive actions are disabled, else ''.
-
-    Args:
-        settings: Runtime configuration containing the destructive-actions flag.
-
-    Returns:
-        A zero-argument callable returning an error string or empty string.
-    """
-    def check() -> str:
-        if not settings.enable_destructive_actions:
-            return _DESTRUCTIVE_ERROR
-        return ""
-    return check
+# Security check helper
+def check_destructive_actions_enabled(settings) -> str | None:
+    """Check if destructive actions are enabled"""
+    if not settings.enable_destructive_actions:
+        return (
+            "Error: Destructive actions are disabled for security. "
+            "To enable bookmark modifications, set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true "
+            "in your environment variables or .env file. "
+            "This includes: add, update, delete, archive, and unarchive operations."
+        )
+    return None
 
 
-def _build_search_bookmarks(client: LinkDingClient) -> Callable:
+def create_mcp_server() -> FastMCP:
+    """Create and configure the MCP server with all tools"""
+    # Get settings lazily when server is created
+    settings = get_settings()
+
+    mcp = FastMCP(
+        name="LinkDing MCP Server",
+        instructions="""
+        This server provides tools for interacting with a LinkDing bookmark manager.
+        You can search for bookmarks, add new ones, manage tags, and perform various
+        bookmark operations. All operations require a valid LinkDing API token.
+
+        Security Note: Write operations (add, update, delete) are disabled by default.
+        Enable them by setting LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true.
+        """,
+    )
+
+    @mcp.tool
     async def search_bookmarks(
-        query: Optional[str] = None,
-        tag: Optional[str] = None,
+        query: str | None = None,
+        tag: str | None = None,
         limit: int = 100,
         offset: int = 0,
         archived: bool = False,
         unread_only: bool = False,
     ) -> str:
-        """Search for bookmarks with various filters.
+        """
+        Search for bookmarks with various filters.
 
         Args:
             query: Search phrase to filter bookmarks (searches title, description, notes, URL)
             tag: Filter by specific tag name
-            limit: Maximum number of results to return (default: 100)
+            limit: Maximum number of results to return (1-1000, default: 100)
             offset: Number of results to skip for pagination (default: 0)
             archived: Search in archived bookmarks instead of active ones
             unread_only: Only return unread bookmarks
@@ -55,51 +64,57 @@ def _build_search_bookmarks(client: LinkDingClient) -> Callable:
         Returns:
             JSON string containing the search results
         """
+        log = logger.bind(tool="search_bookmarks", query=query, tag=tag, limit=limit, archived=archived)
+        log.info("searching_bookmarks")
+
         try:
-            params = {"limit": limit, "offset": offset}
-            if query:
-                params["q"] = query
+            # Validate parameters
+            params = SearchParams(
+                query=query, tag=tag, limit=limit, offset=offset, archived=archived, unread_only=unread_only
+            )
 
-            endpoint = "/bookmarks/archived/" if archived else "/bookmarks/"
-            response = await client.get(endpoint, params=params)
+            async with LinkDingClient(settings) as client:
+                # Get bookmarks
+                bookmark_list = await client.get_bookmarks(
+                    archived=params.archived, q=params.query, limit=params.limit, offset=params.offset
+                )
 
-            if response.status_code != 200:
-                return await handle_api_error(response)
+                # Apply additional filters
+                filtered_results = bookmark_list.results
 
-            data = response.json()
-            bookmark_list = BookmarkList(**data)
+                if params.tag:
+                    filtered_results = [b for b in filtered_results if params.tag in [t.lower() for t in b.tag_names]]
 
-            filtered_results = bookmark_list.results
-            if tag:
-                filtered_results = [b for b in filtered_results if tag in b.tag_names]
-            if unread_only:
-                filtered_results = [b for b in filtered_results if b.unread]
+                if params.unread_only:
+                    filtered_results = [b for b in filtered_results if b.unread]
 
-            bookmark_list.results = filtered_results
-            bookmark_list.count = len(filtered_results)
+                # Update the results
+                bookmark_list.results = filtered_results
+                bookmark_list.count = len(filtered_results)
 
-            return bookmark_list.model_dump_json(indent=2)
+                log.info("search_successful", count=bookmark_list.count)
+                return bookmark_list.model_dump_json(indent=2)
 
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("search_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error searching bookmarks: {str(e)}"
 
-    return search_bookmarks
-
-
-def _build_add_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
+    @mcp.tool
     async def add_bookmark(
         url: str,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        notes: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        title: str | None = None,
+        description: str | None = None,
+        notes: str | None = None,
+        tags: list[str] | None = None,
         is_archived: bool = False,
         unread: bool = False,
         shared: bool = False,
     ) -> str:
-        """Add a new bookmark to LinkDing.
+        """
+        Add a new bookmark to LinkDing.
 
         Args:
             url: The URL to bookmark (required)
@@ -114,40 +129,43 @@ def _build_add_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Cal
         Returns:
             JSON string containing the created bookmark data
         """
-        security_error = guard()
-        if security_error:
-            return security_error
+        # Security check
+        error = check_destructive_actions_enabled(settings)
+        if error:
+            return error
+
+        log = logger.bind(tool="add_bookmark", url=url, tags=tags)
+        log.info("adding_bookmark")
 
         try:
-            payload = {"url": url, "is_archived": is_archived, "unread": unread, "shared": shared}
-            if title:
-                payload["title"] = title
-            if description:
-                payload["description"] = description
-            if notes:
-                payload["notes"] = notes
-            if tags:
-                payload["tag_names"] = tags
+            # Create validated bookmark
+            bookmark = BookmarkCreate(
+                url=url,
+                title=title,
+                description=description,
+                notes=notes,
+                tags=tags or [],
+                is_archived=is_archived,
+                unread=unread,
+                shared=shared,
+            )
 
-            response = await client.post("/bookmarks/", json=payload)
+            async with LinkDingClient(settings) as client:
+                result = await client.create_bookmark(bookmark)
+                log.info("bookmark_added", bookmark_id=result.id)
+                return result.model_dump_json(indent=2)
 
-            if response.status_code not in [200, 201]:
-                return await handle_api_error(response)
-
-            bookmark = Bookmark(**response.json())
-            return bookmark.model_dump_json(indent=2)
-
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("add_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error adding bookmark: {str(e)}"
 
-    return add_bookmark
-
-
-def _build_get_bookmark(client: LinkDingClient) -> Callable:
+    @mcp.tool
     async def get_bookmark(bookmark_id: int) -> str:
-        """Retrieve a specific bookmark by its ID.
+        """
+        Retrieve a specific bookmark by its ID.
 
         Args:
             bookmark_id: The ID of the bookmark to retrieve
@@ -155,38 +173,36 @@ def _build_get_bookmark(client: LinkDingClient) -> Callable:
         Returns:
             JSON string containing the bookmark data
         """
+        log = logger.bind(tool="get_bookmark", bookmark_id=bookmark_id)
+        log.info("getting_bookmark")
+
         try:
-            response = await client.get(f"/bookmarks/{bookmark_id}/")
+            async with LinkDingClient(settings) as client:
+                bookmark = await client.get_bookmark(bookmark_id)
+                log.info("bookmark_retrieved")
+                return bookmark.model_dump_json(indent=2)
 
-            if response.status_code == 404:
-                return f"Bookmark with ID {bookmark_id} not found"
-            elif response.status_code != 200:
-                return await handle_api_error(response)
-
-            bookmark = Bookmark(**response.json())
-            return bookmark.model_dump_json(indent=2)
-
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("get_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error retrieving bookmark: {str(e)}"
 
-    return get_bookmark
-
-
-def _build_update_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
+    @mcp.tool
     async def update_bookmark(
         bookmark_id: int,
-        url: Optional[str] = None,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        notes: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        is_archived: Optional[bool] = None,
-        unread: Optional[bool] = None,
-        shared: Optional[bool] = None,
+        url: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        notes: str | None = None,
+        tags: list[str] | None = None,
+        is_archived: bool | None = None,
+        unread: bool | None = None,
+        shared: bool | None = None,
     ) -> str:
-        """Update an existing bookmark.
+        """
+        Update an existing bookmark.
 
         Args:
             bookmark_id: The ID of the bookmark to update
@@ -202,53 +218,43 @@ def _build_update_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> 
         Returns:
             JSON string containing the updated bookmark data
         """
-        security_error = guard()
-        if security_error:
-            return security_error
+        # Security check
+        error = check_destructive_actions_enabled(settings)
+        if error:
+            return error
+
+        log = logger.bind(tool="update_bookmark", bookmark_id=bookmark_id)
+        log.info("updating_bookmark")
 
         try:
-            payload = {}
-            if url is not None:
-                payload["url"] = url
-            if title is not None:
-                payload["title"] = title
-            if description is not None:
-                payload["description"] = description
-            if notes is not None:
-                payload["notes"] = notes
-            if tags is not None:
-                payload["tag_names"] = tags
-            if is_archived is not None:
-                payload["is_archived"] = is_archived
-            if unread is not None:
-                payload["unread"] = unread
-            if shared is not None:
-                payload["shared"] = shared
+            # Create update model
+            update = BookmarkUpdate(
+                url=url,
+                title=title,
+                description=description,
+                notes=notes,
+                tags=tags,
+                is_archived=is_archived,
+                unread=unread,
+                shared=shared,
+            )
 
-            if not payload:
-                return "No fields provided to update"
+            async with LinkDingClient(settings) as client:
+                result = await client.update_bookmark(bookmark_id, update)
+                log.info("bookmark_updated")
+                return result.model_dump_json(indent=2)
 
-            response = await client.patch(f"/bookmarks/{bookmark_id}/", json=payload)
-
-            if response.status_code == 404:
-                return f"Bookmark with ID {bookmark_id} not found"
-            elif response.status_code != 200:
-                return await handle_api_error(response)
-
-            bookmark = Bookmark(**response.json())
-            return bookmark.model_dump_json(indent=2)
-
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("update_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error updating bookmark: {str(e)}"
 
-    return update_bookmark
-
-
-def _build_delete_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
+    @mcp.tool
     async def delete_bookmark(bookmark_id: int) -> str:
-        """Delete a bookmark by its ID.
+        """
+        Delete a bookmark by its ID.
 
         Args:
             bookmark_id: The ID of the bookmark to delete
@@ -256,31 +262,31 @@ def _build_delete_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> 
         Returns:
             Success or error message
         """
-        security_error = guard()
-        if security_error:
-            return security_error
+        # Security check
+        error = check_destructive_actions_enabled(settings)
+        if error:
+            return error
+
+        log = logger.bind(tool="delete_bookmark", bookmark_id=bookmark_id)
+        log.info("deleting_bookmark")
 
         try:
-            response = await client.delete(f"/bookmarks/{bookmark_id}/")
+            async with LinkDingClient(settings) as client:
+                await client.delete_bookmark(bookmark_id)
+                log.info("bookmark_deleted")
+                return f"Bookmark {bookmark_id} deleted successfully"
 
-            if response.status_code == 404:
-                return f"Bookmark with ID {bookmark_id} not found"
-            elif response.status_code != 204:
-                return await handle_api_error(response)
-
-            return f"Bookmark {bookmark_id} deleted successfully"
-
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("delete_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error deleting bookmark: {str(e)}"
 
-    return delete_bookmark
-
-
-def _build_archive_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
+    @mcp.tool
     async def archive_bookmark(bookmark_id: int) -> str:
-        """Archive a bookmark by its ID.
+        """
+        Archive a bookmark by its ID.
 
         Args:
             bookmark_id: The ID of the bookmark to archive
@@ -288,31 +294,31 @@ def _build_archive_bookmark(client: LinkDingClient, guard: Callable[[], str]) ->
         Returns:
             Success or error message
         """
-        security_error = guard()
-        if security_error:
-            return security_error
+        # Security check
+        error = check_destructive_actions_enabled(settings)
+        if error:
+            return error
+
+        log = logger.bind(tool="archive_bookmark", bookmark_id=bookmark_id)
+        log.info("archiving_bookmark")
 
         try:
-            response = await client.post(f"/bookmarks/{bookmark_id}/archive/")
+            async with LinkDingClient(settings) as client:
+                await client.archive_bookmark(bookmark_id)
+                log.info("bookmark_archived")
+                return f"Bookmark {bookmark_id} archived successfully"
 
-            if response.status_code == 404:
-                return f"Bookmark with ID {bookmark_id} not found"
-            elif response.status_code != 204:
-                return await handle_api_error(response)
-
-            return f"Bookmark {bookmark_id} archived successfully"
-
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("archive_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error archiving bookmark: {str(e)}"
 
-    return archive_bookmark
-
-
-def _build_unarchive_bookmark(client: LinkDingClient, guard: Callable[[], str]) -> Callable:
+    @mcp.tool
     async def unarchive_bookmark(bookmark_id: int) -> str:
-        """Unarchive a bookmark by its ID.
+        """
+        Unarchive a bookmark by its ID.
 
         Args:
             bookmark_id: The ID of the bookmark to unarchive
@@ -320,31 +326,31 @@ def _build_unarchive_bookmark(client: LinkDingClient, guard: Callable[[], str]) 
         Returns:
             Success or error message
         """
-        security_error = guard()
-        if security_error:
-            return security_error
+        # Security check
+        error = check_destructive_actions_enabled(settings)
+        if error:
+            return error
+
+        log = logger.bind(tool="unarchive_bookmark", bookmark_id=bookmark_id)
+        log.info("unarchiving_bookmark")
 
         try:
-            response = await client.post(f"/bookmarks/{bookmark_id}/unarchive/")
+            async with LinkDingClient(settings) as client:
+                await client.unarchive_bookmark(bookmark_id)
+                log.info("bookmark_unarchived")
+                return f"Bookmark {bookmark_id} unarchived successfully"
 
-            if response.status_code == 404:
-                return f"Bookmark with ID {bookmark_id} not found"
-            elif response.status_code != 204:
-                return await handle_api_error(response)
-
-            return f"Bookmark {bookmark_id} unarchived successfully"
-
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("unarchive_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error unarchiving bookmark: {str(e)}"
 
-    return unarchive_bookmark
-
-
-def _build_check_url(client: LinkDingClient) -> Callable:
+    @mcp.tool
     async def check_url(url: str) -> str:
-        """Check if a URL is already bookmarked and get metadata.
+        """
+        Check if a URL is already bookmarked and get metadata.
 
         Args:
             url: The URL to check
@@ -352,111 +358,83 @@ def _build_check_url(client: LinkDingClient) -> Callable:
         Returns:
             JSON string containing bookmark status, metadata, and auto-tags
         """
+        log = logger.bind(tool="check_url", url=url)
+        log.info("checking_url")
+
         try:
-            response = await client.get("/bookmarks/check/", params={"url": url})
+            # Validate URL format
+            from pydantic import HttpUrl
 
-            if response.status_code != 200:
-                return await handle_api_error(response)
+            HttpUrl(url)  # This will raise if invalid
 
-            check_result = BookmarkCheck(**response.json())
-            return check_result.model_dump_json(indent=2)
+            async with LinkDingClient(settings) as client:
+                result = await client.check_url(url)
+                log.info("url_checked", is_bookmarked=result.bookmark is not None)
+                return result.model_dump_json(indent=2)
 
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("check_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error checking URL: {str(e)}"
 
-    return check_url
-
-
-def _build_list_tags(client: LinkDingClient) -> Callable:
+    @mcp.tool
     async def list_tags(limit: int = 100, offset: int = 0) -> str:
-        """List all available tags.
+        """
+        List all available tags.
 
         Args:
-            limit: Maximum number of tags to return (default: 100)
+            limit: Maximum number of tags to return (1-1000, default: 100)
             offset: Number of tags to skip for pagination (default: 0)
 
         Returns:
             JSON string containing the list of tags
         """
+        log = logger.bind(tool="list_tags", limit=limit, offset=offset)
+        log.info("listing_tags")
+
         try:
-            response = await client.get("/tags/", params={"limit": limit, "offset": offset})
+            # Validate parameters
+            if limit < 1 or limit > 1000:
+                return "Error: limit must be between 1 and 1000"
+            if offset < 0:
+                return "Error: offset must be non-negative"
 
-            if response.status_code != 200:
-                return await handle_api_error(response)
+            async with LinkDingClient(settings) as client:
+                tag_list = await client.get_tags(limit=limit, offset=offset)
+                log.info("tags_listed", count=tag_list.count)
+                return tag_list.model_dump_json(indent=2)
 
-            tag_list = TagList(**response.json())
-            return tag_list.model_dump_json(indent=2)
-
-        except httpx.RequestError as e:
-            return f"Connection error: {str(e)}"
+        except LinkDingError as e:
+            log.error("list_failed", error=str(e))
+            return f"Error: {str(e)}"
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error listing tags: {str(e)}"
 
-    return list_tags
-
-
-def _build_list_bookmarks_by_tag(search_fn: Callable) -> Callable:
+    @mcp.tool
     async def list_bookmarks_by_tag(tag_name: str, limit: int = 100, offset: int = 0) -> str:
-        """List bookmarks filtered by a specific tag.
+        """
+        List bookmarks filtered by a specific tag.
 
         Args:
             tag_name: Name of the tag to filter by
-            limit: Maximum number of bookmarks to return (default: 100)
+            limit: Maximum number of bookmarks to return (1-1000, default: 100)
             offset: Number of bookmarks to skip for pagination (default: 0)
 
         Returns:
             JSON string containing bookmarks with the specified tag
         """
+        log = logger.bind(tool="list_bookmarks_by_tag", tag_name=tag_name, limit=limit, offset=offset)
+        log.info("listing_bookmarks_by_tag")
+
         try:
-            return await search_fn(tag=tag_name, limit=limit, offset=offset)
+            # Use search_bookmarks with tag filter
+            return await search_bookmarks(tag=tag_name, limit=limit, offset=offset)
+
         except Exception as e:
+            log.error("unexpected_error", error=str(e))
             return f"Error listing bookmarks by tag: {str(e)}"
 
-    return list_bookmarks_by_tag
-
-
-def register_tools(mcp: FastMCP, client: LinkDingClient, settings: Settings) -> None:
-    """Register all 11 LinkDing tools with the given FastMCP instance.
-
-    Args:
-        mcp: The FastMCP server to register tools on.
-        client: The LinkDing HTTP client shared across all tools.
-        settings: Runtime configuration (used to build the destructive-action guard).
-    """
-    guard = _destructive_guard(settings)
-    search_fn = _build_search_bookmarks(client)
-
-    mcp.tool(search_fn)
-    mcp.tool(_build_add_bookmark(client, guard))
-    mcp.tool(_build_get_bookmark(client))
-    mcp.tool(_build_update_bookmark(client, guard))
-    mcp.tool(_build_delete_bookmark(client, guard))
-    mcp.tool(_build_archive_bookmark(client, guard))
-    mcp.tool(_build_unarchive_bookmark(client, guard))
-    mcp.tool(_build_check_url(client))
-    mcp.tool(_build_list_tags(client))
-    mcp.tool(_build_list_bookmarks_by_tag(search_fn))
-
-
-def create_mcp_server(settings: Settings) -> FastMCP:
-    """Build and return a configured FastMCP instance with all tools registered.
-
-    Args:
-        settings: Runtime configuration for the LinkDing connection.
-
-    Returns:
-        A FastMCP server with all 11 bookmark tools registered.
-    """
-    client = LinkDingClient(settings)
-    mcp = FastMCP(
-        name="LinkDing MCP Server",
-        instructions="""
-        This server provides tools for interacting with a LinkDing bookmark manager.
-        You can search for bookmarks, add new ones, manage tags, and perform various
-        bookmark operations. All operations require a valid LinkDing API token.
-        """,
-    )
-    register_tools(mcp, client, settings)
     return mcp

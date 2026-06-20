@@ -16,6 +16,8 @@ The LinkDing MCP Server is configured through environment variables. This guide 
 |----------|---------|-------------|
 | `LINKDING_URL` | `http://127.0.0.1:9090` | URL of your LinkDing instance |
 | `LINKDING_ENABLE_DESTRUCTIVE_ACTIONS` | `false` | Enable bookmark modifications (add, update, delete, archive) |
+| `LINKDING_VERIFY_SSL` | `true` | Enable SSL/TLS certificate verification |
+| `LINKDING_SSL_CERT_PATH` | _(unset)_ | Path to a custom CA bundle or certificate file |
 | `DEBUG` | `false` | Enable debug logging |
 
 ## Configuration File
@@ -74,6 +76,57 @@ Error: Destructive actions are disabled for security.
 To enable bookmark modifications, set LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=true 
 in your environment variables or .env file. 
 This includes: add, update, delete, archive, and unarchive operations.
+```
+
+### SSL/TLS Verification
+
+The server verifies SSL/TLS certificates for all HTTPS connections by default. Two environment variables control this behavior.
+
+#### `LINKDING_VERIFY_SSL`
+
+| Value | Behavior |
+|-------|----------|
+| `true` (default) | Verify certificates using the system CA bundle |
+| `false` | Skip certificate verification entirely |
+
+```env
+# Default — secure
+LINKDING_VERIFY_SSL=true
+
+# Disable verification (see warning below)
+LINKDING_VERIFY_SSL=false
+```
+
+!!! danger "Disabling SSL verification is a security risk"
+    Setting `LINKDING_VERIFY_SSL=false` means the server will accept any certificate
+    presented by the LinkDing host, including forged ones. This exposes all traffic
+    (including your API token) to man-in-the-middle attacks. Only use this setting
+    on fully trusted, isolated networks where you control both endpoints and cannot
+    install a proper certificate. A WARNING is emitted at startup when verification
+    is disabled.
+
+#### `LINKDING_SSL_CERT_PATH`
+
+Specifies a custom CA bundle or certificate file (PEM format). Use this when your LinkDing instance uses a private or internal certificate authority rather than a publicly trusted one.
+
+```env
+LINKDING_SSL_CERT_PATH=/etc/ssl/certs/my-internal-ca.pem
+```
+
+Leave this variable unset to use the system default CA bundle.
+
+**Precedence:**
+
+1. If `LINKDING_VERIFY_SSL=false`, verification is skipped entirely (cert path is ignored).
+2. If `LINKDING_SSL_CERT_PATH` is set, that CA bundle is used for verification.
+3. Otherwise, the system default CA bundle is used.
+
+**Example — self-hosted instance with internal CA:**
+
+```env
+LINKDING_URL=https://bookmarks.internal.example.com
+LINKDING_API_TOKEN=your_token_here
+LINKDING_SSL_CERT_PATH=/usr/local/share/ca-certificates/internal-ca.crt
 ```
 
 ## LinkDing URL Configuration
