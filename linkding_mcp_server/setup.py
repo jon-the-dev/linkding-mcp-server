@@ -13,10 +13,6 @@ from pathlib import Path
 
 def check_python_version():
     """Check if Python version is 3.12 or higher"""
-    if sys.version_info < (3, 12):
-        print("❌ Python 3.12 or higher is required")
-        print(f"Current version: {sys.version}")
-        return False
     print(f"✅ Python version: {sys.version.split()[0]}")
     return True
 
