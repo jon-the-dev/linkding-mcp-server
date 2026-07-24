@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 from .client import LinkDingClient, LinkDingError
 from .config import Settings
 from .models import BookmarkCreate, BookmarkUpdate, SearchParams
+from .protocols import ClientFactory
 
 # Configure structured logging
 logger = structlog.get_logger()
@@ -29,7 +30,7 @@ def check_destructive_actions_enabled(settings) -> str | None:
     return None
 
 
-def _build_search_bookmarks(settings):
+def _build_search_bookmarks(settings, client_factory: ClientFactory):
     """Build the search_bookmarks tool bound to the given settings."""
 
     async def search_bookmarks(
@@ -63,7 +64,7 @@ def _build_search_bookmarks(settings):
                 query=query, tag=tag, limit=limit, offset=offset, archived=archived, unread_only=unread_only
             )
 
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 # Get bookmarks
                 bookmark_list = await client.get_bookmarks(
                     archived=params.archived, q=params.query, limit=params.limit, offset=params.offset
@@ -95,7 +96,7 @@ def _build_search_bookmarks(settings):
     return search_bookmarks
 
 
-def _build_add_bookmark(settings):
+def _build_add_bookmark(settings, client_factory: ClientFactory):
     """Build the add_bookmark tool bound to the given settings."""
 
     async def add_bookmark(
@@ -145,7 +146,7 @@ def _build_add_bookmark(settings):
                 shared=shared,
             )
 
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 result = await client.create_bookmark(bookmark)
                 log.info("bookmark_added", bookmark_id=result.id)
                 return result.model_dump_json(indent=2)
@@ -160,7 +161,7 @@ def _build_add_bookmark(settings):
     return add_bookmark
 
 
-def _build_get_bookmark(settings):
+def _build_get_bookmark(settings, client_factory: ClientFactory):
     """Build the get_bookmark tool bound to the given settings."""
 
     async def get_bookmark(bookmark_id: int) -> str:
@@ -177,7 +178,7 @@ def _build_get_bookmark(settings):
         log.info("getting_bookmark")
 
         try:
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 bookmark = await client.get_bookmark(bookmark_id)
                 log.info("bookmark_retrieved")
                 return bookmark.model_dump_json(indent=2)
@@ -192,7 +193,7 @@ def _build_get_bookmark(settings):
     return get_bookmark
 
 
-def _build_update_bookmark(settings):
+def _build_update_bookmark(settings, client_factory: ClientFactory):
     """Build the update_bookmark tool bound to the given settings."""
 
     async def update_bookmark(
@@ -244,7 +245,7 @@ def _build_update_bookmark(settings):
                 shared=shared,
             )
 
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 result = await client.update_bookmark(bookmark_id, update)
                 log.info("bookmark_updated")
                 return result.model_dump_json(indent=2)
@@ -259,7 +260,7 @@ def _build_update_bookmark(settings):
     return update_bookmark
 
 
-def _build_delete_bookmark(settings):
+def _build_delete_bookmark(settings, client_factory: ClientFactory):
     """Build the delete_bookmark tool bound to the given settings."""
 
     async def delete_bookmark(bookmark_id: int) -> str:
@@ -281,7 +282,7 @@ def _build_delete_bookmark(settings):
         log.info("deleting_bookmark")
 
         try:
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 await client.delete_bookmark(bookmark_id)
                 log.info("bookmark_deleted")
                 return f"Bookmark {bookmark_id} deleted successfully"
@@ -296,7 +297,7 @@ def _build_delete_bookmark(settings):
     return delete_bookmark
 
 
-def _build_archive_bookmark(settings):
+def _build_archive_bookmark(settings, client_factory: ClientFactory):
     """Build the archive_bookmark tool bound to the given settings."""
 
     async def archive_bookmark(bookmark_id: int) -> str:
@@ -318,7 +319,7 @@ def _build_archive_bookmark(settings):
         log.info("archiving_bookmark")
 
         try:
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 await client.archive_bookmark(bookmark_id)
                 log.info("bookmark_archived")
                 return f"Bookmark {bookmark_id} archived successfully"
@@ -333,7 +334,7 @@ def _build_archive_bookmark(settings):
     return archive_bookmark
 
 
-def _build_unarchive_bookmark(settings):
+def _build_unarchive_bookmark(settings, client_factory: ClientFactory):
     """Build the unarchive_bookmark tool bound to the given settings."""
 
     async def unarchive_bookmark(bookmark_id: int) -> str:
@@ -355,7 +356,7 @@ def _build_unarchive_bookmark(settings):
         log.info("unarchiving_bookmark")
 
         try:
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 await client.unarchive_bookmark(bookmark_id)
                 log.info("bookmark_unarchived")
                 return f"Bookmark {bookmark_id} unarchived successfully"
@@ -370,7 +371,7 @@ def _build_unarchive_bookmark(settings):
     return unarchive_bookmark
 
 
-def _build_check_url(settings):
+def _build_check_url(settings, client_factory: ClientFactory):
     """Build the check_url tool bound to the given settings."""
 
     async def check_url(url: str) -> str:
@@ -392,7 +393,7 @@ def _build_check_url(settings):
 
             HttpUrl(url)  # This will raise if invalid
 
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 result = await client.check_url(url)
                 log.info("url_checked", is_bookmarked=result.bookmark is not None)
                 return result.model_dump_json(indent=2)
@@ -407,7 +408,7 @@ def _build_check_url(settings):
     return check_url
 
 
-def _build_list_tags(settings):
+def _build_list_tags(settings, client_factory: ClientFactory):
     """Build the list_tags tool bound to the given settings."""
 
     async def list_tags(limit: int = 100, offset: int = 0) -> str:
@@ -431,7 +432,7 @@ def _build_list_tags(settings):
             if offset < 0:
                 return "Error: offset must be non-negative"
 
-            async with LinkDingClient(settings) as client:
+            async with client_factory(settings) as client:
                 tag_list = await client.get_tags(limit=limit, offset=offset)
                 log.info("tags_listed", count=tag_list.count)
                 return tag_list.model_dump_json(indent=2)
@@ -475,31 +476,35 @@ def _build_list_bookmarks_by_tag(settings, search_bookmarks):
     return list_bookmarks_by_tag
 
 
-def register_tools(mcp: FastMCP, settings) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, client_factory: ClientFactory) -> None:
     """Register all LinkDing tools on the given MCP server.
 
     Args:
         mcp: The FastMCP server to register tools on.
         settings: Runtime settings shared by every tool.
     """
-    search_bookmarks = _build_search_bookmarks(settings)
+    search_bookmarks = _build_search_bookmarks(settings, client_factory)
     mcp.tool(search_bookmarks)
-    mcp.tool(_build_add_bookmark(settings))
-    mcp.tool(_build_get_bookmark(settings))
-    mcp.tool(_build_update_bookmark(settings))
-    mcp.tool(_build_delete_bookmark(settings))
-    mcp.tool(_build_archive_bookmark(settings))
-    mcp.tool(_build_unarchive_bookmark(settings))
-    mcp.tool(_build_check_url(settings))
-    mcp.tool(_build_list_tags(settings))
+    mcp.tool(_build_add_bookmark(settings, client_factory))
+    mcp.tool(_build_get_bookmark(settings, client_factory))
+    mcp.tool(_build_update_bookmark(settings, client_factory))
+    mcp.tool(_build_delete_bookmark(settings, client_factory))
+    mcp.tool(_build_archive_bookmark(settings, client_factory))
+    mcp.tool(_build_unarchive_bookmark(settings, client_factory))
+    mcp.tool(_build_check_url(settings, client_factory))
+    mcp.tool(_build_list_tags(settings, client_factory))
     mcp.tool(_build_list_bookmarks_by_tag(settings, search_bookmarks))
 
 
-def create_mcp_server(settings: Settings) -> FastMCP:
+def create_mcp_server(
+    settings: Settings,
+    client_factory: ClientFactory | None = None,
+) -> FastMCP:
     """Create and configure the MCP server with all tools.
 
     Args:
         settings: Runtime configuration injected by the caller.
+        client_factory: Optional async client factory for adapters and tests.
 
     Returns:
         A configured FastMCP server with all tools registered.
@@ -516,6 +521,6 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         """,
     )
 
-    register_tools(mcp, settings)
+    register_tools(mcp, settings, client_factory or LinkDingClient)
 
     return mcp
