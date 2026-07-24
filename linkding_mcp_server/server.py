@@ -11,38 +11,8 @@ import structlog
 
 from linkding_mcp_server import __version__
 from linkding_mcp_server.config import Settings
+from linkding_mcp_server.logging_config import configure_logging
 from linkding_mcp_server.tools import create_mcp_server
-
-
-# Configure structured logging
-def configure_logging(settings):
-    """Configure structured logging based on settings"""
-    structlog.configure(
-        processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.PositionalArgumentsFormatter(),
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.dev.ConsoleRenderer() if settings.debug else structlog.processors.JSONRenderer(),
-        ],
-        context_class=dict,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
-    )
-
-    # Set log level
-    import logging
-
-    log_level = getattr(logging, settings.log_level, logging.INFO)
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stderr,
-        level=log_level,
-    )
 
 
 def main():
