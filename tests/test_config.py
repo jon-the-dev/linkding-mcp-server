@@ -164,12 +164,14 @@ LINKDING_LOG_LEVEL=WARNING
         assert settings.debug is True
 
     def test_cache_settings(self):
-        """Test cache TTL settings"""
+        """Test cache TTL and maximum-size settings."""
         settings = Settings(
             linkding_api_token="token",
-            cache_ttl=600
+            cache_ttl=600,
+            cache_max_size=250,
         )
         assert settings.cache_ttl == 600
+        assert settings.cache_max_size == 250
 
         # Test bounds
         with pytest.raises(ValidationError):
@@ -183,6 +185,19 @@ LINKDING_LOG_LEVEL=WARNING
                 linkding_api_token="token",
                 cache_ttl=3601  # Max is 3600
             )
+
+        with pytest.raises(ValidationError):
+            Settings(linkding_api_token="token", cache_max_size=0)
+
+        with pytest.raises(ValidationError):
+            Settings(linkding_api_token="token", cache_max_size=10001)
+
+    def test_cache_max_size_environment_variable(self, monkeypatch):
+        """The documented environment variable controls the LRU capacity."""
+        monkeypatch.setenv("LINKDING_API_TOKEN", "token")
+        monkeypatch.setenv("LINKDING_CACHE_MAX_SIZE", "42")
+
+        assert Settings().cache_max_size == 42
 
     def test_rate_limit_settings(self):
         """Test rate limiting settings"""

@@ -387,6 +387,7 @@ The server supports extensive configuration through environment variables:
 | `LINKDING_REQUEST_TIMEOUT` | `30` | Request timeout (seconds) |
 | `LINKDING_MAX_RETRIES` | `3` | Retry attempts on failure |
 | `LINKDING_CACHE_TTL` | `300` | Cache duration (seconds) |
+| `LINKDING_CACHE_MAX_SIZE` | `100` | Maximum entries before LRU eviction |
 | `LINKDING_RATE_LIMIT_CALLS` | `100` | API calls per period |
 | `LINKDING_RATE_LIMIT_PERIOD` | `60` | Rate limit window (seconds) |
 | `LINKDING_LOG_LEVEL` | `INFO` | Logging verbosity |

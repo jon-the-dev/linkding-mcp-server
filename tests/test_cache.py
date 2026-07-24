@@ -37,6 +37,16 @@ class TestLRUCache:
         assert client._get_from_cache("key1") is None
         assert client._get_from_cache("key4") == "value4"
 
+    def test_cache_storage_remains_bounded_under_load(self, mock_settings):
+        client = LinkDingClient(mock_settings)
+
+        for index in range(10_000):
+            client._add_to_cache(f"key{index}", f"value{index}")
+
+        assert len(client._cache) == mock_settings.cache_max_size
+        assert len(client._cache_timestamps) == mock_settings.cache_max_size
+        assert client._cache.keys() == client._cache_timestamps.keys()
+
     def test_cache_lru_order(self, mock_settings):
         client = LinkDingClient(mock_settings)
         client._add_to_cache("key1", "value1")
