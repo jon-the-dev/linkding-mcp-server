@@ -4,7 +4,8 @@ import asyncio
 import logging
 import time
 from collections import OrderedDict
-from typing import Any
+from collections.abc import AsyncIterator, Callable
+from typing import Any, TypeVar
 
 import httpx
 import structlog
@@ -23,6 +24,8 @@ logger = structlog.get_logger()
 
 # Standard library logger used for SSL status and tenacity compatibility
 _module_logger = logging.getLogger(__name__)
+
+ResultT = TypeVar("ResultT")
 
 
 class RateLimitError(Exception):
@@ -328,13 +331,30 @@ class LinkDingClient:
         return result
 
     async def paginate_results(
-        self, endpoint: str, model_class, params: dict[str, Any], max_results: int | None = None
-    ) -> list:
-        """Helper to paginate through all results"""
-        all_results = []
+        self,
+        endpoint: str,
+        model_class: Callable[..., ResultT],
+        params: dict[str, Any],
+        max_results: int | None = None,
+        max_pages: int | None = None,
+    ) -> AsyncIterator[ResultT]:
+        """Stream model instances from a paginated API endpoint.
+
+        Results are yielded one at a time so callers do not need to retain the
+        complete result set in memory. ``max_results`` remains available for
+        callers that limit by item count, while ``max_pages`` bounds the number
+        of API pages fetched.
+        """
         next_url = endpoint
+        yielded_results = 0
+        fetched_pages = 0
 
         while next_url:
+            if max_results and yielded_results >= max_results:
+                return
+            if max_pages and fetched_pages >= max_pages:
+                return
+
             if next_url == endpoint:
                 # First request with params
                 response = await self._make_request("GET", next_url, params=params)
@@ -347,18 +367,19 @@ class LinkDingClient:
                 raise LinkDingError(error)
 
             data = response.json()
-            all_results.extend(data.get("results", []))
+            fetched_pages += 1
 
-            if max_results and len(all_results) >= max_results:
-                return all_results[:max_results]
+            for item in data.get("results", []):
+                if max_results and yielded_results >= max_results:
+                    return
+                yield model_class(**item)
+                yielded_results += 1
 
             # Get next page URL
             next_url = data.get("next")
             if next_url:
                 # Extract path from full URL
                 next_url = next_url.replace(str(self.settings.linkding_url), "")
-
-        return all_results
 
     def _get_from_cache(self, key: str) -> Any | None:
         """Get item from cache if not expired.

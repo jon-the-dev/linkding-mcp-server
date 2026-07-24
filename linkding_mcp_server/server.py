@@ -6,18 +6,12 @@ A Model Context Protocol server for interacting with LinkDing bookmark manager.
 """
 
 import sys
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as pkg_version
 
 import structlog
 
+from linkding_mcp_server import __version__
 from linkding_mcp_server.config import Settings
 from linkding_mcp_server.tools import create_mcp_server
-
-try:
-    __version__ = pkg_version("linkding-mcp-server")
-except PackageNotFoundError:
-    __version__ = "dev"
 
 
 # Configure structured logging

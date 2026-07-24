@@ -8,7 +8,7 @@ import pytest
 
 from linkding_mcp_server.client import LinkDingClient, LinkDingError, RateLimitError, _resolve_ssl_verify
 from linkding_mcp_server.config import Settings
-from linkding_mcp_server.models import BookmarkCreate, BookmarkUpdate
+from linkding_mcp_server.models import Bookmark, BookmarkCreate, BookmarkUpdate
 
 
 @pytest.fixture
@@ -38,6 +38,23 @@ def create_mock_response(status_code: int, json_data: dict = None):
     response.json.return_value = json_data or {}
     response.text = str(json_data) if json_data else ""
     return response
+
+
+def _bookmark_data(bookmark_id: int) -> dict:
+    """Build a complete LinkDing bookmark response."""
+    return {
+        "id": bookmark_id,
+        "url": f"https://example.com/{bookmark_id}",
+        "title": f"Bookmark {bookmark_id}",
+        "description": "",
+        "notes": "",
+        "is_archived": False,
+        "unread": False,
+        "shared": False,
+        "tag_names": [],
+        "date_added": "2024-01-01T00:00:00Z",
+        "date_modified": "2024-01-01T00:00:00Z",
+    }
 
 
 class TestLinkDingClient:
@@ -212,6 +229,101 @@ class TestLinkDingClient:
             result = await client.update_bookmark(1, update)
             assert result.title == "Updated Title"
             assert "updated" in result.tag_names
+
+    def test_build_update_payload_includes_false_and_empty_values(self, settings):
+        """The payload helper preserves explicit values while omitting only None."""
+        client = LinkDingClient(settings)
+        update = BookmarkUpdate(
+            title="",
+            description=None,
+            tags=[],
+            is_archived=False,
+            unread=True,
+            shared=False,
+        )
+
+        assert client._build_update_payload(update) == {
+            "title": "",
+            "tag_names": [],
+            "is_archived": False,
+            "unread": True,
+            "shared": False,
+        }
+
+    @pytest.mark.asyncio
+    async def test_paginate_results_streams_large_datasets(self, settings):
+        """Pagination yields each item before requesting the following page."""
+        client = LinkDingClient(settings)
+        request_count = 0
+
+        async def mock_request(method, endpoint, **kwargs):
+            nonlocal request_count
+            request_count += 1
+            page = request_count
+            next_url = (
+                f"{settings.linkding_url}api/bookmarks/?page={page + 1}"
+                if page < 100
+                else None
+            )
+            return create_mock_response(
+                200,
+                {
+                    "results": [
+                        _bookmark_data((page - 1) * 100 + offset)
+                        for offset in range(1, 101)
+                    ],
+                    "next": next_url,
+                },
+            )
+
+        client._make_request = mock_request
+        results = client.paginate_results("/bookmarks/", Bookmark, {})
+        first = await anext(results)
+
+        assert first.id == 1
+        assert request_count == 1
+
+        remaining_ids = [bookmark.id async for bookmark in results]
+        assert remaining_ids[-1] == 10_000
+        assert len(remaining_ids) == 9_999
+        assert request_count == 100
+
+    @pytest.mark.asyncio
+    async def test_paginate_results_honors_result_and_page_limits(self, settings):
+        """Both legacy item limits and page limits stop additional requests."""
+        client = LinkDingClient(settings)
+        request_count = 0
+
+        async def mock_request(method, endpoint, **kwargs):
+            nonlocal request_count
+            request_count += 1
+            return create_mock_response(
+                200,
+                {
+                    "results": [_bookmark_data(request_count)],
+                    "next": f"{settings.linkding_url}api/bookmarks/?page={request_count + 1}",
+                },
+            )
+
+        client._make_request = mock_request
+        by_page = [
+            bookmark.id
+            async for bookmark in client.paginate_results(
+                "/bookmarks/", Bookmark, {}, max_pages=3
+            )
+        ]
+        assert by_page == [1, 2, 3]
+        assert request_count == 3
+
+        request_count = 0
+        by_result = [
+            bookmark.id
+            async for bookmark in client.paginate_results(
+                "/bookmarks/", Bookmark, {}, max_results=2
+            )
+        ]
+        assert by_result == [1, 2]
+        assert request_count == 2
 
     @pytest.mark.asyncio
     async def test_delete_bookmark(self, settings):
