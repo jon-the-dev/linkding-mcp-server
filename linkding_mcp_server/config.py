@@ -58,6 +58,12 @@ class Settings(BaseSettings):
         description="Maximum number of items in cache",
     )
 
+    # Observability settings
+    observability_enabled: bool = Field(
+        default=False,
+        description="Emit dependency-free structured metric events",
+    )
+
     # Debug settings
     debug: bool = Field(default=False, description="Enable debug logging")
     log_level: str = Field(default="INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR)")

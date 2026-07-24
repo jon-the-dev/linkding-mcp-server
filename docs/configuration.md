@@ -18,6 +18,7 @@ The LinkDing MCP Server is configured through environment variables. This guide 
 | `LINKDING_ENABLE_DESTRUCTIVE_ACTIONS` | `false` | Enable bookmark modifications (add, update, delete, archive) |
 | `LINKDING_VERIFY_SSL` | `true` | Enable SSL/TLS certificate verification |
 | `LINKDING_SSL_CERT_PATH` | _(unset)_ | Path to a custom CA bundle or certificate file |
+| `LINKDING_OBSERVABILITY_ENABLED` | `false` | Emit redacted structured metric events |
 | `DEBUG` | `false` | Enable debug logging |
 
 ## Configuration File
@@ -35,6 +36,9 @@ LINKDING_ENABLE_DESTRUCTIVE_ACTIONS=false
 # Optional Settings
 DEBUG=false
 ```
+
+See [Observability](observability.md) for the event schema, privacy rules, and
+collector mapping.
 
 ## Security Configuration
 
