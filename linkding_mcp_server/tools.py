@@ -11,6 +11,11 @@ from .models import BookmarkCreate, BookmarkUpdate, SearchParams
 logger = structlog.get_logger()
 
 
+def _format_client_error(error: LinkDingError) -> str:
+    """Translate an expected client-layer failure into an MCP response."""
+    return f"Error: {error}"
+
+
 # Security check helper
 def check_destructive_actions_enabled(settings) -> str | None:
     """Check if destructive actions are enabled"""
@@ -82,7 +87,7 @@ def _build_search_bookmarks(settings):
 
         except LinkDingError as e:
             log.error("search_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error searching bookmarks: {str(e)}"
@@ -147,7 +152,7 @@ def _build_add_bookmark(settings):
 
         except LinkDingError as e:
             log.error("add_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error adding bookmark: {str(e)}"
@@ -179,7 +184,7 @@ def _build_get_bookmark(settings):
 
         except LinkDingError as e:
             log.error("get_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error retrieving bookmark: {str(e)}"
@@ -246,7 +251,7 @@ def _build_update_bookmark(settings):
 
         except LinkDingError as e:
             log.error("update_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error updating bookmark: {str(e)}"
@@ -283,7 +288,7 @@ def _build_delete_bookmark(settings):
 
         except LinkDingError as e:
             log.error("delete_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error deleting bookmark: {str(e)}"
@@ -320,7 +325,7 @@ def _build_archive_bookmark(settings):
 
         except LinkDingError as e:
             log.error("archive_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error archiving bookmark: {str(e)}"
@@ -357,7 +362,7 @@ def _build_unarchive_bookmark(settings):
 
         except LinkDingError as e:
             log.error("unarchive_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error unarchiving bookmark: {str(e)}"
@@ -394,7 +399,7 @@ def _build_check_url(settings):
 
         except LinkDingError as e:
             log.error("check_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error checking URL: {str(e)}"
@@ -433,7 +438,7 @@ def _build_list_tags(settings):
 
         except LinkDingError as e:
             log.error("list_failed", error=str(e))
-            return f"Error: {str(e)}"
+            return _format_client_error(e)
         except Exception as e:
             log.error("unexpected_error", error=str(e))
             return f"Error listing tags: {str(e)}"

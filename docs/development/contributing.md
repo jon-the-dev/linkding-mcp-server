@@ -242,9 +242,12 @@ docs(api): update tool parameter documentation
            # Implementation here
            result = await some_api_call(param1, param2)
            return json.dumps(result)
-       except Exception as e:
-           logger.error(f"Error in new_tool_name: {e}")
-           return f"Error: {str(e)}"
+       except LinkDingError as error:
+           logger.error("new_tool_failed", error=str(error))
+           return _format_client_error(error)
+       except Exception as error:
+           logger.error("unexpected_error", error=str(error))
+           return f"Error running new tool: {error}"
    ```
 
 2. **Add comprehensive docstring:**
@@ -254,8 +257,9 @@ docs(api): update tool parameter documentation
    - Usage examples in docstring
 
 3. **Add error handling:**
-   - Catch specific exceptions
-   - Return user-friendly error messages
+   - Let client methods raise `LinkDingError`
+   - Translate `LinkDingError` with `_format_client_error` at the MCP boundary
+   - Reserve broad exception handling for unexpected tool-boundary failures
    - Log errors for debugging
 
 4. **Write tests:**

@@ -28,14 +28,14 @@ _module_logger = logging.getLogger(__name__)
 ResultT = TypeVar("ResultT")
 
 
-class RateLimitError(Exception):
-    """Raised when rate limit is exceeded"""
+class LinkDingError(Exception):
+    """Base exception for LinkDing API errors"""
 
     pass
 
 
-class LinkDingError(Exception):
-    """Base exception for LinkDing API errors"""
+class RateLimitError(LinkDingError):
+    """Raised when LinkDing or the local limiter rejects a request."""
 
     pass
 
@@ -121,9 +121,10 @@ class LinkDingClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException)),
+        reraise=True,
     )
-    async def _make_request(self, method: str, endpoint: str, **kwargs) -> httpx.Response:
-        """Make HTTP request with retry logic"""
+    async def _request_with_retry(self, method: str, endpoint: str, **kwargs) -> httpx.Response:
+        """Make one retry-managed HTTP request."""
         if not self.client:
             raise LinkDingError("Client not initialized. Use async context manager.")
 
@@ -149,6 +150,15 @@ class LinkDingClient:
         except httpx.TimeoutException as e:
             log.error("timeout_error", error=str(e))
             raise
+
+    async def _make_request(self, method: str, endpoint: str, **kwargs) -> httpx.Response:
+        """Make an HTTP request and expose expected failures as domain errors."""
+        try:
+            return await self._request_with_retry(method, endpoint, **kwargs)
+        except LinkDingError:
+            raise
+        except (httpx.NetworkError, httpx.TimeoutException) as error:
+            raise LinkDingError(f"LinkDing request failed: {error}") from error
 
     async def handle_api_error(self, response: httpx.Response) -> str:
         """Extract meaningful error message from API response"""
