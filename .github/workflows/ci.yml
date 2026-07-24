@@ -21,13 +21,22 @@ jobs:
         run: pip install uv
 
       - name: Install dependencies
-        run: uv sync --dev 2>/dev/null || pip install -e ".[dev]" 2>/dev/null || echo "No dev deps found, continuing"
+        run: uv sync --extra dev
 
       - name: Lint (ruff)
-        run: uv run ruff check . 2>/dev/null || python -m ruff check . 2>/dev/null || echo "ruff not configured, skipping"
+        run: uv run ruff check linkding_mcp_server tests
 
       - name: Type check (mypy)
-        run: uv run mypy . 2>/dev/null || python -m mypy . 2>/dev/null || echo "mypy not configured, skipping"
+        continue-on-error: true
+        run: uv run mypy linkding_mcp_server
 
-      - name: Test (pytest)
-        run: uv run pytest 2>/dev/null || python -m pytest 2>/dev/null || echo "No tests found, skipping"
+      - name: Unit and offline integration tests
+        run: >
+          uv run pytest -m "not performance"
+          --cov=linkding_mcp_server
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-fail-under=90
+
+      - name: Performance baseline
+        run: uv run pytest -m performance --durations=10

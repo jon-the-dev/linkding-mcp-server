@@ -17,13 +17,13 @@ from linkding_mcp_server.tools import create_mcp_server
 
 def main():
     """Main entry point for the server"""
+    logger = structlog.get_logger()
     try:
         # Load settings (constructed explicitly; no global singleton)
         settings = Settings()
 
         # Configure logging
         configure_logging(settings)
-        logger = structlog.get_logger()
 
         logger.info(
             "server_starting",

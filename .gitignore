@@ -50,3 +50,9 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Test and coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
