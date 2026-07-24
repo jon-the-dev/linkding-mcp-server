@@ -62,6 +62,7 @@ nav:
   - Getting Started:
       - Installation: installation.md
       - Configuration: configuration.md
+      - Observability: observability.md
       - Quick Start: quickstart.md
   - Examples:
       - Example Prompts: examples/prompts.md

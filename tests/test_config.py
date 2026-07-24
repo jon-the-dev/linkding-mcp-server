@@ -199,6 +199,14 @@ LINKDING_LOG_LEVEL=WARNING
 
         assert Settings().cache_max_size == 42
 
+    def test_observability_is_disabled_by_default_and_configurable(self, monkeypatch):
+        """Structured metrics require explicit opt-in."""
+        assert Settings(linkding_api_token="token").observability_enabled is False
+
+        monkeypatch.setenv("LINKDING_API_TOKEN", "token")
+        monkeypatch.setenv("LINKDING_OBSERVABILITY_ENABLED", "true")
+        assert Settings().observability_enabled is True
+
     def test_rate_limit_settings(self):
         """Test rate limiting settings"""
         settings = Settings(

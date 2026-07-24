@@ -18,6 +18,12 @@ from tenacity import (
 
 from linkding_mcp_server.config import Settings
 from linkding_mcp_server.models import Bookmark, BookmarkCheck, BookmarkCreate, BookmarkList, BookmarkUpdate, TagList
+from linkding_mcp_server.telemetry import (
+    MetricsSink,
+    NoOpMetricsSink,
+    StructuredLogMetricsSink,
+    normalize_endpoint,
+)
 
 # Configure structured logging for application use
 logger = structlog.get_logger()
@@ -78,10 +84,23 @@ def _log_ssl_status(settings: Settings) -> None:
 class LinkDingClient:
     """HTTP client for LinkDing API with retry and connection pooling"""
 
-    def __init__(self, settings: Settings):
+    def __init__(
+        self,
+        settings: Settings,
+        metrics: MetricsSink | None = None,
+    ):
         self.settings = settings
         self.client: httpx.AsyncClient | None = None
-        self.rate_limiter = RateLimiter(calls=settings.rate_limit_calls, period=settings.rate_limit_period)
+        self.metrics = metrics or (
+            StructuredLogMetricsSink()
+            if settings.observability_enabled
+            else NoOpMetricsSink()
+        )
+        self.rate_limiter = RateLimiter(
+            calls=settings.rate_limit_calls,
+            period=settings.rate_limit_period,
+            metrics=self.metrics,
+        )
         self._cache: OrderedDict[str, Any] = OrderedDict()
         self._cache_timestamps: dict[str, float] = {}
         _log_ssl_status(settings)
@@ -133,22 +152,56 @@ class LinkDingClient:
 
         log = logger.bind(method=method, endpoint=endpoint)
         log.debug("making_request")
+        started_at = time.perf_counter()
+        metric_attributes = {
+            "method": method.upper(),
+            "endpoint": normalize_endpoint(endpoint),
+        }
 
         try:
             response = await self.client.request(method, endpoint, **kwargs)
             log.debug("request_completed", status_code=response.status_code)
+            duration_ms = (time.perf_counter() - started_at) * 1000
 
             # Check for rate limiting response
             if response.status_code == 429:
+                self.metrics.record(
+                    "linkding.http.request",
+                    **metric_attributes,
+                    status_code=429,
+                    outcome="rate_limited",
+                    duration_ms=duration_ms,
+                )
                 raise RateLimitError("Rate limit exceeded")
 
+            self.metrics.record(
+                "linkding.http.request",
+                **metric_attributes,
+                status_code=response.status_code,
+                outcome="success" if response.status_code < 400 else "error",
+                duration_ms=duration_ms,
+            )
             return response
 
         except httpx.NetworkError as e:
             log.error("network_error", error=str(e))
+            self.metrics.record(
+                "linkding.http.request",
+                **metric_attributes,
+                outcome="error",
+                error_type=type(e).__name__,
+                duration_ms=(time.perf_counter() - started_at) * 1000,
+            )
             raise
         except httpx.TimeoutException as e:
             log.error("timeout_error", error=str(e))
+            self.metrics.record(
+                "linkding.http.request",
+                **metric_attributes,
+                outcome="error",
+                error_type=type(e).__name__,
+                duration_ms=(time.perf_counter() - started_at) * 1000,
+            )
             raise
 
     async def _make_request(self, method: str, endpoint: str, **kwargs) -> httpx.Response:
@@ -408,10 +461,14 @@ class LinkDingClient:
             if time.time() - timestamp < self.settings.cache_ttl:
                 self._cache.move_to_end(key)
                 logger.debug("cache_hit", key=key)
+                self.metrics.record("linkding.cache.access", outcome="hit")
                 return self._cache[key]
             else:
                 del self._cache[key]
                 self._cache_timestamps.pop(key, None)
+                self.metrics.record("linkding.cache.access", outcome="expired")
+                return None
+        self.metrics.record("linkding.cache.access", outcome="miss")
         return None
 
     def _add_to_cache(self, key: str, value: Any):
@@ -430,18 +487,26 @@ class LinkDingClient:
             evicted_key, _ = self._cache.popitem(last=False)
             self._cache_timestamps.pop(evicted_key, None)
             logger.debug("cache_evicted", key=evicted_key)
+            self.metrics.record("linkding.cache.eviction", reason="capacity")
         self._cache[key] = value
         self._cache_timestamps[key] = time.time()
+        self.metrics.record("linkding.cache.size", entries=len(self._cache))
         logger.debug("cache_set", key=key)
 
 
 class RateLimiter:
     """Simple rate limiter for API requests"""
 
-    def __init__(self, calls: int, period: int):
+    def __init__(
+        self,
+        calls: int,
+        period: int,
+        metrics: MetricsSink | None = None,
+    ):
         self.calls = calls
         self.period = period
         self.timestamps: list[float] = []
+        self.metrics = metrics or NoOpMetricsSink()
 
     async def check(self):
         """Check if request is allowed under rate limit"""
@@ -449,6 +514,12 @@ class RateLimiter:
 
         # Remove old timestamps
         self.timestamps = [ts for ts in self.timestamps if now - ts < self.period]
+        self.metrics.record(
+            "linkding.rate_limit.usage",
+            used=len(self.timestamps),
+            limit=self.calls,
+            utilization=len(self.timestamps) / self.calls,
+        )
 
         if len(self.timestamps) >= self.calls:
             # Calculate wait time
@@ -456,6 +527,10 @@ class RateLimiter:
             wait_time = self.period - (now - oldest) + 0.1
             if wait_time > 0:
                 logger.warning("rate_limit_wait", wait_seconds=wait_time)
+                self.metrics.record(
+                    "linkding.rate_limit.wait",
+                    duration_ms=wait_time * 1000,
+                )
                 await asyncio.sleep(wait_time)
 
         self.timestamps.append(now)

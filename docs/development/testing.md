@@ -637,6 +637,19 @@ def test_with_fixture(load_fixture):
 
 ```python
 # tests/test_performance.py
+
+### Observability Testing
+
+Observability tests use an injected in-memory metrics sink and mocked HTTP
+responses. They require neither a collector nor a running LinkDing instance:
+
+```bash
+uv run pytest tests/test_telemetry.py -v
+```
+
+The tests assert event classification and redaction rather than log formatting,
+so future StatsD, Prometheus, or OpenTelemetry adapters can reuse the same
+contract.
 import pytest
 import time
 import asyncio
