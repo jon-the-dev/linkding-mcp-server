@@ -111,8 +111,27 @@ class TestLinkDingClient:
             assert call_count == 3
 
     @pytest.mark.asyncio
+    async def test_exhausted_network_retries_raise_domain_error(self, settings, monkeypatch):
+        """Transport failures never leak HTTP-library exceptions to callers."""
+        async with LinkDingClient(settings) as client:
+            async def mock_request(*args, **kwargs):
+                raise httpx.NetworkError("offline")
+
+            client.client.request = mock_request
+            monkeypatch.setattr(
+                client._request_with_retry.retry,
+                "wait",
+                lambda retry_state: 0,
+            )
+
+            with pytest.raises(LinkDingError, match="LinkDing request failed: offline"):
+                await client._make_request("GET", "/test")
+
+    @pytest.mark.asyncio
     async def test_rate_limit_error(self, settings):
-        """Test rate limit error handling"""
+        """Rate limits use the same public domain-error contract."""
+        assert issubclass(RateLimitError, LinkDingError)
+
         async with LinkDingClient(settings) as client:
             async def mock_request(*args, **kwargs):
                 return create_mock_response(429)

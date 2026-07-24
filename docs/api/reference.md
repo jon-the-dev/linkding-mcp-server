@@ -342,6 +342,30 @@ async def make_request(method: str, endpoint: str, **kwargs) -> dict:
 
 ## Error Handling
 
+### Layer Contract
+
+Direct Python callers handle client exceptions:
+
+```python
+from linkding_mcp_server.client import LinkDingClient, LinkDingError
+
+try:
+    async with LinkDingClient(settings) as client:
+        bookmark = await client.get_bookmark(123)
+except LinkDingError as error:
+    logger.warning("linkding_request_failed", error=str(error))
+```
+
+MCP callers receive the translated error as tool content:
+
+```python
+result = await mcp_client.call_tool("get_bookmark", {"bookmark_id": 123})
+# result.content[0].text == "Error: Bookmark with ID 123 not found"
+```
+
+`RateLimitError` is a `LinkDingError`, so direct and MCP callers use the same
+contract for API rate-limit responses.
+
 ### HTTP Status Codes
 
 | Status Code | Meaning | Handling |
@@ -352,27 +376,6 @@ async def make_request(method: str, endpoint: str, **kwargs) -> dict:
 | 401 | Unauthorized | Return authentication error |
 | 404 | Not Found | Return "not found" message |
 | 500 | Server Error | Return generic error message |
-
-### Error Response Format
-
-```python
-def format_error(error: Exception) -> str:
-    """Format error for MCP response"""
-    if isinstance(error, httpx.HTTPStatusError):
-        status_code = error.response.status_code
-        if status_code == 401:
-            return "Error: Invalid API token or unauthorized access"
-        elif status_code == 404:
-            return "Error: Resource not found"
-        elif status_code == 400:
-            return f"Error: Bad request - {error.response.text}"
-        else:
-            return f"Error: HTTP {status_code} - {error.response.text}"
-    elif isinstance(error, httpx.RequestError):
-        return f"Error: Connection failed - {str(error)}"
-    else:
-        return f"Error: {str(error)}"
-```
 
 ## Environment Configuration
 

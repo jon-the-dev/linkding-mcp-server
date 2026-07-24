@@ -6,6 +6,7 @@ import pytest
 from fastmcp import Client
 
 from linkding_mcp_server import tools
+from linkding_mcp_server.client import LinkDingError, RateLimitError
 from linkding_mcp_server.config import Settings
 from linkding_mcp_server.models import Tag, TagList
 from linkding_mcp_server.tools import create_mcp_server
@@ -80,3 +81,27 @@ async def test_list_tags_validates_limit(settings):
     async with Client(mcp) as client:
         result = await client.call_tool("list_tags", {"limit": 0})
     assert "limit must be between 1 and 1000" in result.content[0].text
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (LinkDingError("LinkDing unavailable"), "Error: LinkDing unavailable"),
+        (RateLimitError("Rate limit exceeded"), "Error: Rate limit exceeded"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_tools_translate_client_errors(monkeypatch, settings, error, expected):
+    """Expected client failures become stable MCP error strings."""
+
+    class FailingClient:
+        async def get_tags(self, limit, offset):
+            raise error
+
+    _patch_client(monkeypatch, FailingClient())
+    mcp = create_mcp_server(settings)
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("list_tags", {})
+
+    assert result.content[0].text == expected

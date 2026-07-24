@@ -86,12 +86,15 @@ search_bookmarks(tag="tutorials", query="react")
 
 ## Error Handling
 
-All tools include comprehensive error handling:
+Error handling has a deliberate layer boundary:
 
-- **Network errors**: Graceful handling of connection issues
-- **API errors**: Clear error messages from LinkDing API
-- **Validation errors**: Parameter validation with helpful messages
-- **Not found errors**: Appropriate responses for missing resources
+- `LinkDingClient` raises `LinkDingError` (including `RateLimitError`) for
+  expected API, connectivity, and rate-limit failures.
+- MCP tools catch those domain errors, log them, and return a stable
+  `Error: <message>` string because MCP tool responses are values rather than
+  Python exceptions.
+- Validation and unexpected programming failures are handled at the tool
+  boundary with operation-specific context.
 
 ## Response Formats
 
