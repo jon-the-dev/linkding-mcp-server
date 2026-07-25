@@ -59,9 +59,9 @@ class TestSettings:
     def test_masked_token(self):
         """Test token masking for logs"""
         # Normal token
-        settings = Settings(linkding_api_token="abcd1234efgh5678")
+        settings = Settings(linkding_api_token="unit-test-token")
         masked = settings.get_masked_token()
-        assert masked == "abcd...5678"
+        assert masked == "unit...oken"
 
         # Short token
         settings = Settings(linkding_api_token="short")

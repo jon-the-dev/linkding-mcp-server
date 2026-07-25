@@ -22,7 +22,9 @@ The Model Context Protocol (MCP) is an open protocol that standardizes how appli
 ### 1. Install
 
 ```bash
-pip install linkding-mcp-server
+git clone https://github.com/jon-the-dev/linkding-mcp-server.git
+cd linkding-mcp-server
+uv sync
 ```
 
 ### 2. Configure

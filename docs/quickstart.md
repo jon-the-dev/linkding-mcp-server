@@ -12,16 +12,18 @@ Before starting, ensure you have:
 
 ## 5-Minute Setup
 
-### 1. Install the Package
+### 1. Clone and install
 
 ```bash
-pip install linkding-mcp-server
+git clone https://github.com/jon-the-dev/linkding-mcp-server.git
+cd linkding-mcp-server
+uv sync
 ```
 
 ### 2. Run the Setup Wizard
 
 ```bash
-linkding-mcp-setup
+uv run linkding-mcp-setup
 ```
 
 Follow the prompts to configure your LinkDing connection. The wizard will:
@@ -149,7 +151,7 @@ echo $LINKDING_URL
 echo $LINKDING_API_TOKEN
 
 # Verify LinkDing is running
-curl http://127.0.0.1:9090/api/bookmarks/ -H "Authorization: Token YOUR_TOKEN"
+curl http://127.0.0.1:9090/api/bookmarks/ -H "Authorization: Token ${LINKDING_API_TOKEN}"
 
 # Check Python version
 python --version  # Should be 3.12+

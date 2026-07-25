@@ -14,7 +14,7 @@ Claude supports the Model Context Protocol (MCP), allowing you to extend its cap
 
 ## Prerequisites
 
-- LinkDing MCP Server installed (`pip install linkding-mcp-server`)
+- LinkDing MCP Server cloned and installed with `uv sync`
 - LinkDing instance running and accessible
 - LinkDing API token
 
@@ -314,7 +314,7 @@ python -m json.tool ~/.claude.json
 #### 3. Test API Connectivity
 
 ```bash
-curl -H "Authorization: Token your_token" http://127.0.0.1:9090/api/bookmarks/
+curl -H "Authorization: Token ${LINKDING_API_TOKEN}" http://127.0.0.1:9090/api/bookmarks/
 ```
 
 ### Log Analysis

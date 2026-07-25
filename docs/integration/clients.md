@@ -34,9 +34,8 @@ FastMCP provides a command-line interface for interacting with MCP servers direc
 
 ### Installation
 
-```bash
-pip install linkding-mcp-server
-```
+Clone the repository and run `uv sync`; the first PyPI release is not yet
+published.
 
 ### Basic Usage
 
