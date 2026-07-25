@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     { name = "Jon Price", email = "jon@jonprice.io" }
 ]
-license = { text = "AGPL-3.0" }
+license = "AGPL-3.0-only"
 keywords = [
     "mcp",
     "model-context-protocol",
@@ -48,7 +48,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/jon-the-dev/linkding-mcp-server"
 Issues = "https://github.com/jon-the-dev/linkding-mcp-server/issues"
-Documentation = "https://github.com/jon-the-dev/linkding-mcp-server#readme"
+Documentation = "https://jon-the-dev.github.io/linkding-mcp-server/"
 Repository = "https://github.com/jon-the-dev/linkding-mcp-server.git"
 Changelog = "https://github.com/jon-the-dev/linkding-mcp-server/blob/main/CHANGELOG.md"
 

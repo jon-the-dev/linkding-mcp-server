@@ -12,28 +12,15 @@ Before you begin, ensure you have:
 
 ## Installation Methods
 
-### Quick Install from PyPI (Recommended)
-
-The easiest way to install is via pip:
-
-```bash
-pip install linkding-mcp-server
-```
-
-Or using uv (faster):
-
-```bash
-uv pip install linkding-mcp-server
-```
-
 ### Install from Source
 
-For development or latest features:
+The first PyPI release is not published yet. Install the current release from
+GitHub:
 
 ```bash
 git clone https://github.com/jon-the-dev/linkding-mcp-server.git
 cd linkding-mcp-server
-pip install -e .
+uv sync
 ```
 
 ## Initial Setup
@@ -41,7 +28,7 @@ pip install -e .
 After installation, run the interactive setup wizard:
 
 ```bash
-linkding-mcp-setup
+uv run linkding-mcp-setup
 ```
 
 This will:
@@ -109,7 +96,7 @@ Test that everything is working correctly:
 
 ```bash
 # Check the CLI is available
-linkding-mcp --help
+uv run linkding-mcp --help
 
 # Or run a quick test
 python -c "from linkding_mcp_server import __version__; print(f'Version: {__version__}')"
@@ -152,7 +139,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN pip install linkding-mcp-server
+RUN pip install git+https://github.com/jon-the-dev/linkding-mcp-server.git
 
 EXPOSE 8000
 
@@ -177,7 +164,7 @@ docker run -p 8000:8000 \
 : Run `linkding-mcp-setup` to configure your credentials, or set the environment variable manually
 
 **"Module not found" errors**
-: Ensure the package is installed: `pip install linkding-mcp-server`
+: From the cloned repository, run `uv sync`
 
 **"Connection refused" errors**
 : Verify your LinkDing instance is running and accessible at the configured URL

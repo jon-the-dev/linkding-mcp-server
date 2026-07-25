@@ -171,7 +171,7 @@ python health_check.py
 
 4. **Test API endpoint:**
    ```bash
-   curl -H "Authorization: Token YOUR_TOKEN" \
+   curl -H "Authorization: Token ${LINKDING_API_TOKEN}" \
         http://127.0.0.1:9090/api/bookmarks/?limit=1
    ```
 
@@ -196,7 +196,7 @@ python health_check.py
 
 3. **Test token manually:**
    ```bash
-   curl -H "Authorization: Token YOUR_ACTUAL_TOKEN" \
+   curl -H "Authorization: Token ${LINKDING_API_TOKEN}" \
         http://127.0.0.1:9090/api/bookmarks/?limit=1
    ```
 
@@ -215,7 +215,7 @@ python health_check.py
 2. **Verify API endpoints:**
    ```bash
    # Test different endpoints
-   curl -H "Authorization: Token YOUR_TOKEN" \
+   curl -H "Authorization: Token ${LINKDING_API_TOKEN}" \
         http://127.0.0.1:9090/api/bookmarks/
    ```
 
@@ -383,7 +383,7 @@ python health_check.py
 
 3. **Check LinkDing performance:**
    ```bash
-   curl -w "@curl-format.txt" -H "Authorization: Token YOUR_TOKEN" \
+   curl -w "@curl-format.txt" -H "Authorization: Token ${LINKDING_API_TOKEN}" \
         http://127.0.0.1:9090/api/bookmarks/?limit=100
    ```
 
@@ -528,7 +528,7 @@ grep "search_bookmarks" linkding-mcp.log
 3. **Test with curl:**
    ```bash
    # Verbose output
-   curl -v -H "Authorization: Token YOUR_TOKEN" \
+   curl -v -H "Authorization: Token ${LINKDING_API_TOKEN}" \
         http://127.0.0.1:9090/api/bookmarks/?limit=1
    ```
 

@@ -1,7 +1,7 @@
 site_name: LinkDing MCP Server
 site_description: A Model Context Protocol server for interacting with LinkDing bookmark manager
 site_author: LinkDing MCP Server Contributors
-site_url: https://github.com/jon-the-dev/linkding-mcp-server
+site_url: https://jon-the-dev.github.io/linkding-mcp-server/
 
 repo_name: linkding-mcp-server
 repo_url: https://github.com/jon-the-dev/linkding-mcp-server
@@ -78,6 +78,7 @@ nav:
       - API Reference: api/reference.md
       - Contributing: development/contributing.md
       - Testing: development/testing.md
+      - Security Review: security-review.md
   - Troubleshooting: troubleshooting.md
   - FAQ: faq.md
 
