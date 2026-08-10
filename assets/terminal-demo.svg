@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">LinkDing MCP terminal demonstration</title>
+  <desc id="desc">A terminal-style example in which an AI client searches LinkDing bookmarks for FastMCP and receives two results.</desc>
+  <rect width="960" height="430" rx="18" fill="#0d1117"/>
+  <rect width="960" height="52" rx="18" fill="#161b22"/>
+  <rect y="34" width="960" height="18" fill="#161b22"/>
+  <circle cx="28" cy="26" r="7" fill="#ff5f56"/>
+  <circle cx="52" cy="26" r="7" fill="#ffbd2e"/>
+  <circle cx="76" cy="26" r="7" fill="#27c93f"/>
+  <text x="480" y="32" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">linkding-mcp — stdio</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17">
+    <text x="28" y="91" fill="#7ee787">you ›</text>
+    <text x="92" y="91" fill="#e6edf3">Search my bookmarks for “FastMCP” tagged “python”</text>
+    <text x="28" y="139" fill="#79c0ff">mcp ›</text>
+    <text x="92" y="139" fill="#e6edf3">search_bookmarks</text>
+    <text x="294" y="139" fill="#8b949e">{"query":"FastMCP","tag":"python"}</text>
+    <text x="28" y="188" fill="#d2a8ff">linkding ›</text>
+    <text x="136" y="188" fill="#e6edf3">2 bookmarks found</text>
+    <rect x="28" y="214" width="904" height="76" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="48" y="245" fill="#f0f6fc">FastMCP documentation</text>
+    <text x="48" y="272" fill="#8b949e">gofastmcp.com  ·  python, mcp, reference</text>
+    <rect x="28" y="304" width="904" height="76" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="48" y="335" fill="#f0f6fc">Build an MCP server with FastMCP</text>
+    <text x="48" y="362" fill="#8b949e">example.com/fastmcp  ·  python, tutorial</text>
+    <text x="28" y="408" fill="#8b949e">read-only mode  •  credentials redacted  •  12 ms</text>
+  </g>
+</svg>
