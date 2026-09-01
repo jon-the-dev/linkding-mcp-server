@@ -9,10 +9,10 @@ pytest-mock>=3.11.0
 
 # Code quality
 black>=26.3.1
-isort>=8.0.1
+isort>=9.0.1
 flake8>=7.3.0
 mypy>=1.5.0
-pylint>=4.0.6
+pylint>=4.0.8
 
 # Type stubs
-types-python-dateutil>=2.9.0.20260716
+types-python-dateutil>=2.9.0.20260807
